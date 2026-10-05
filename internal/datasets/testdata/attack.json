@@ -1,0 +1,33 @@
+{
+  "type": "bundle",
+  "id": "bundle--test",
+  "objects": [
+    {"type": "x-mitre-collection", "id": "x-mitre-collection--1", "name": "Enterprise ATT&CK", "x_mitre_version": "18.0"},
+    {"type": "x-mitre-tactic", "id": "x-mitre-tactic--exec", "name": "Execution", "x_mitre_shortname": "execution",
+     "external_references": [{"source_name": "mitre-attack", "external_id": "TA0002", "url": "https://attack.mitre.org/tactics/TA0002"}]},
+    {"type": "attack-pattern", "id": "attack-pattern--t1059", "name": "Command and Scripting Interpreter",
+     "description": "Adversaries may abuse interpreters.(Citation: Example 2020)\n\n  \nRun <code>cmd.exe</code>.",
+     "x_mitre_platforms": ["Windows", "Linux"],
+     "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "execution"}],
+     "external_references": [{"source_name": "mitre-attack", "external_id": "T1059", "url": "https://attack.mitre.org/techniques/T1059"}]},
+    {"type": "attack-pattern", "id": "attack-pattern--t1059-001", "name": "PowerShell", "x_mitre_is_subtechnique": true,
+     "description": "Adversaries may abuse [PowerShell](https://attack.mitre.org/techniques/T1059/001) commands.",
+     "x_mitre_platforms": ["Windows"],
+     "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "execution"}],
+     "external_references": [{"source_name": "mitre-attack", "external_id": "T1059.001", "url": "https://attack.mitre.org/techniques/T1059/001"}]},
+    {"type": "attack-pattern", "id": "attack-pattern--revoked", "name": "Old", "revoked": true,
+     "external_references": [{"source_name": "mitre-attack", "external_id": "T9999"}]},
+    {"type": "intrusion-set", "id": "intrusion-set--lazarus", "name": "Lazarus Group", "aliases": ["Lazarus Group", "HIDDEN COBRA", "ZINC"],
+     "external_references": [{"source_name": "mitre-attack", "external_id": "G0032", "url": "https://attack.mitre.org/groups/G0032"}]},
+    {"type": "malware", "id": "malware--x", "name": "BADCALL", "x_mitre_aliases": ["BADCALL"],
+     "external_references": [{"source_name": "mitre-attack", "external_id": "S0245"}]},
+    {"type": "course-of-action", "id": "course-of-action--m1042", "name": "Disable or Remove Feature or Program", "x_mitre_deprecated": false,
+     "external_references": [{"source_name": "mitre-attack", "external_id": "M1042"}]},
+    {"type": "relationship", "id": "relationship--1", "relationship_type": "subtechnique-of", "source_ref": "attack-pattern--t1059-001", "target_ref": "attack-pattern--t1059"},
+    {"type": "relationship", "id": "relationship--2", "relationship_type": "uses", "source_ref": "intrusion-set--lazarus", "target_ref": "attack-pattern--t1059-001"},
+    {"type": "relationship", "id": "relationship--3", "relationship_type": "uses", "source_ref": "intrusion-set--lazarus", "target_ref": "malware--x"},
+    {"type": "relationship", "id": "relationship--4", "relationship_type": "mitigates", "source_ref": "course-of-action--m1042", "target_ref": "attack-pattern--t1059-001"},
+    {"type": "relationship", "id": "relationship--5", "relationship_type": "uses", "source_ref": "intrusion-set--lazarus", "target_ref": "attack-pattern--revoked"},
+    {"type": "relationship", "id": "relationship--6", "relationship_type": "detects", "source_ref": "x-mitre-data-component--1", "target_ref": "attack-pattern--t1059"}
+  ]
+}
