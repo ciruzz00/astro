@@ -2,6 +2,7 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -30,10 +32,19 @@ type StatusError struct {
 }
 
 func (e *StatusError) Error() string {
-	if e.Body == "" {
-		return fmt.Sprintf("unexpected HTTP status %d", e.Code)
+	var msg string
+	switch e.Code {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		msg = fmt.Sprintf("authentication failed (HTTP %d): check the API key", e.Code)
+	case http.StatusTooManyRequests:
+		msg = "rate limit or quota exceeded (HTTP 429)"
+	default:
+		msg = fmt.Sprintf("unexpected HTTP status %d", e.Code)
 	}
-	return fmt.Sprintf("unexpected HTTP status %d: %s", e.Code, e.Body)
+	if e.Body != "" {
+		msg += ": " + e.Body
+	}
+	return msg
 }
 
 // NewClient returns a client with TLS 1.2+, bounded timeouts and a redirect
@@ -99,7 +110,26 @@ func Do(c *http.Client, req *http.Request, limit int64) ([]byte, error) {
 
 // GetJSON performs a GET and decodes the JSON response into v.
 func GetJSON(ctx context.Context, c *http.Client, url string, header http.Header, v any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	return doJSON(ctx, c, http.MethodGet, url, header, nil, "", v)
+}
+
+// PostForm sends form values and decodes the JSON response into v.
+func PostForm(ctx context.Context, c *http.Client, endpoint string, header http.Header, form url.Values, v any) error {
+	return doJSON(ctx, c, http.MethodPost, endpoint, header,
+		strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", v)
+}
+
+// PostJSON sends payload as JSON and decodes the JSON response into v.
+func PostJSON(ctx context.Context, c *http.Client, endpoint string, header http.Header, payload, v any) error {
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return doJSON(ctx, c, http.MethodPost, endpoint, header, bytes.NewReader(b), "application/json", v)
+}
+
+func doJSON(ctx context.Context, c *http.Client, method, endpoint string, header http.Header, body io.Reader, contentType string, v any) error {
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
 		return err
 	}
@@ -109,11 +139,14 @@ func GetJSON(ctx context.Context, c *http.Client, url string, header http.Header
 		}
 	}
 	req.Header.Set("Accept", "application/json")
-	body, err := Do(c, req, MaxBody)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := Do(c, req, MaxBody)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(body, v); err != nil {
+	if err := json.Unmarshal(resp, v); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
