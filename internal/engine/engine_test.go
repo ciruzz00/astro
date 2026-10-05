@@ -119,3 +119,12 @@ func TestSearchMany(t *testing.T) {
 		t.Errorf("SearchMany = %+v", reps)
 	}
 }
+
+func TestSetProviders(t *testing.T) {
+	e := New([]provider.Provider{&fake{name: "a", types: []ioc.Type{ioc.IPv4}}})
+	e.SetProviders([]provider.Provider{&fake{name: "b", types: []ioc.Type{ioc.IPv4}}})
+	rep := e.Search(context.Background(), ip, SearchOptions{})
+	if len(rep.Results) != 1 || rep.Results[0].Provider != "b" {
+		t.Errorf("results = %+v", rep.Results)
+	}
+}

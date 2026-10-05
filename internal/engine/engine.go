@@ -25,6 +25,7 @@ type Cache interface {
 
 // Engine runs searches across providers.
 type Engine struct {
+	mu        sync.RWMutex
 	providers []provider.Provider
 	cache     Cache
 	timeout   time.Duration
@@ -54,7 +55,19 @@ func New(providers []provider.Provider, opts ...Option) *Engine {
 }
 
 // Providers returns the configured providers.
-func (e *Engine) Providers() []provider.Provider { return e.providers }
+func (e *Engine) Providers() []provider.Provider {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return append([]provider.Provider(nil), e.providers...)
+}
+
+// SetProviders replaces the providers, e.g. after an API key changed.
+// Searches already running keep the previous set.
+func (e *Engine) SetProviders(ps []provider.Provider) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.providers = append([]provider.Provider(nil), ps...)
+}
 
 // Report is the aggregated outcome of a search.
 type Report struct {
@@ -76,7 +89,7 @@ type SearchOptions struct {
 func (e *Engine) Search(ctx context.Context, ind ioc.Indicator, opts SearchOptions) *Report {
 	start := e.now()
 	var selected []provider.Provider
-	for _, p := range e.providers {
+	for _, p := range e.Providers() {
 		if p.Supports(ind.Type) && (len(opts.Only) == 0 || slices.Contains(opts.Only, p.Name())) {
 			selected = append(selected, p)
 		}
