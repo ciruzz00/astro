@@ -17,7 +17,10 @@ import (
 
 	"github.com/ciruzz00/astro/internal/api"
 	"github.com/ciruzz00/astro/internal/auth"
+	"github.com/ciruzz00/astro/internal/datasets"
+	"github.com/ciruzz00/astro/internal/httpx"
 	"github.com/ciruzz00/astro/internal/store"
+	"github.com/ciruzz00/astro/internal/web"
 )
 
 func newServeCmd(g *globalFlags) *cobra.Command {
@@ -26,13 +29,14 @@ func newServeCmd(g *globalFlags) *cobra.Command {
 		allowRemote bool
 		certFile    string
 		keyFile     string
+		noWeb       bool
 	)
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Start the REST API server",
-		Long: `Start the REST API (OpenAPI spec at /api/v1/openapi.json).
-Every endpoint except health and the spec requires a bearer token created
-with 'astro token create'. The server listens on localhost only unless
+		Short: "Start the web interface and the REST API",
+		Long: `Start the web interface (/) and the REST API (/api/v1, OpenAPI spec at
+/api/v1/openapi.json). Sign in to the web interface and call the API with a
+token created with 'astro token create'. The server listens on localhost only unless
 --allow-remote is given; use TLS (or a TLS reverse proxy) in that case.`,
 		Example: `  astro token create soar
   astro serve
@@ -59,7 +63,7 @@ with 'astro token create'. The server listens on localhost only unless
 				logger.Warn("listening beyond localhost without TLS: make sure only trusted hosts can reach this port (in Docker, publish it on 127.0.0.1) or put a TLS proxy in front")
 			}
 
-			srv := api.NewHTTPServer(addr, api.NewHandler(api.Config{
+			apiHandler := api.NewHandler(api.Config{
 				Engine:        a.engine,
 				Cases:         a.cases,
 				Sources:       a.apiSources(),
@@ -67,7 +71,27 @@ with 'astro token create'. The server listens on localhost only unless
 				Version:       version,
 				AttackVersion: a.attackVersion(cmd.Context()),
 				Logger:        logger,
-			}))
+			})
+			root := http.NewServeMux()
+			root.Handle("/api/", apiHandler)
+			if !noWeb {
+				webHandler, err := web.NewHandler(web.Config{
+					Engine:  a.engine,
+					Cases:   a.cases,
+					Store:   a.store,
+					Tokens:  auth.NewManager(a.store),
+					Sources: a.apiSources(),
+					Fetcher: datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
+					Version: version,
+					Secure:  certFile != "",
+					Logger:  logger,
+				})
+				if err != nil {
+					return err
+				}
+				root.Handle("/", webHandler)
+			}
+			srv := api.NewHTTPServer(addr, root)
 			srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 			return run(cmd.Context(), srv, certFile, keyFile, logger)
 		},
@@ -76,6 +100,7 @@ with 'astro token create'. The server listens on localhost only unless
 	cmd.Flags().BoolVar(&allowRemote, "allow-remote", false, "allow listening on non-loopback addresses")
 	cmd.Flags().StringVar(&certFile, "tls-cert", "", "TLS certificate file (PEM)")
 	cmd.Flags().StringVar(&keyFile, "tls-key", "", "TLS private key file (PEM)")
+	cmd.Flags().BoolVar(&noWeb, "no-web", false, "serve only the REST API, without the web interface")
 	return cmd
 }
 
@@ -104,7 +129,7 @@ func run(ctx context.Context, srv *http.Server, certFile, keyFile string, logger
 	if certFile != "" {
 		scheme = "https"
 	}
-	logger.Info("astro API listening", "url", scheme+"://"+ln.Addr().String()+"/api/v1", "spec", "/api/v1/openapi.json")
+	logger.Info("astro listening", "web", scheme+"://"+ln.Addr().String()+"/", "api", "/api/v1", "spec", "/api/v1/openapi.json")
 
 	errc := make(chan error, 1)
 	go func() {
