@@ -7,8 +7,8 @@ detected automatically and looked up across many intelligence feeds at once.
 Built for incident response, threat hunting and CTF/DFIR challenges
 (Hack The Box Sherlocks, TryHackMe).
 
-> **Status:** early development. The CLI, the REST API, cases and all the sources
-> below work; web UI, TUI and PDF reports are on the roadmap.
+> **Status:** early development. The CLI, the web interface, the REST API, cases
+> and all the sources below work; TUI and PDF reports are on the roadmap.
 
 ## Features
 
@@ -96,6 +96,26 @@ re-searched later (`astro case search brutus --all`). Exports are marked with th
 case TLP; Markdown reports defang indicators and escape provider data, STIX
 bundles use the OASIS TLP 2.0 markings, and Navigator layers highlight the case
 techniques plus those referenced by threat intel on its indicators.
+
+## Web interface
+
+```sh
+astro token create web    # prints a token once: it is your password for the UI
+astro serve               # open http://127.0.0.1:8080 and sign in with the token
+```
+
+Everything the CLI does is available in the browser: search (one indicator per
+line, extraction from pasted text or uploaded files, source selection, offline
+mode), IOC extraction with bulk actions, cases (create, add, search, notes, tags,
+edit, close, delete, export), dataset sync, source status and API token
+management.
+
+The interface is rendered on the server and works without JavaScript; htmx is
+vendored (integrity-checked) for faster navigation. Sessions use HttpOnly,
+SameSite=Strict cookies, cross-origin form posts are rejected, and a strict
+Content-Security-Policy forbids inline scripts. Provider data is always escaped.
+Revoking a token signs out its sessions. Use `astro serve --no-web` to serve the
+API only.
 
 ## REST API
 
@@ -191,7 +211,7 @@ make test     # go test -race
 make check    # verify, vet, staticcheck, gosec, govulncheck, tests
 make run ARGS="search CVE-2021-44228"
 make token NAME=soar   # create an API token
-make serve    # REST API on http://127.0.0.1:8080
+make serve    # web interface and REST API on http://127.0.0.1:8080
 make cross    # release archives for every OS/arch in dist/
 make clean    # remove containers and build output
 ```
