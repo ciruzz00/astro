@@ -7,8 +7,9 @@ detected automatically and looked up across many intelligence feeds at once.
 Built for incident response, threat hunting and CTF/DFIR challenges
 (Hack The Box Sherlocks, TryHackMe).
 
-> **Status:** early development. The CLI, the web interface, the REST API, cases
-> and all the sources below work; TUI and PDF reports are on the roadmap.
+> **Status:** early development. The CLI, the web interface (English and
+> Italian), the REST API, cases with PDF reports and all the sources below work;
+> a terminal UI is on the roadmap.
 
 ## Features
 
@@ -21,8 +22,8 @@ Built for incident response, threat hunting and CTF/DFIR challenges
   the IEEE MAC registry, searchable without network access.
 - **Parallel lookups** with per-source timeouts, rate limits and a local cache.
 - **Cases** to collect indicators, results, notes and tags under a TLP marking,
-  resume them later and export them as Markdown, JSON, STIX 2.1 or an ATT&CK
-  Navigator layer.
+  resume them later and export them as a PDF report, Markdown, JSON, STIX 2.1
+  or an ATT&CK Navigator layer.
 - **JSON output** for scripting.
 
 ## Sources
@@ -44,7 +45,8 @@ Built for incident response, threat hunting and CTF/DFIR challenges
 | IEEE OUI | MAC address | no | offline |
 
 `astro providers` shows which sources are enabled with your keys. Sources that
-require a key are skipped until it is set.
+require a key are skipped until it is set: add keys in the web interface
+(**API keys**) or with `astro keys set <name>`, and they take effect immediately.
 
 ### OPSEC
 
@@ -87,13 +89,15 @@ astro case add brutus -f auth.log --search          # extract, add and search IO
 astro search --case brutus "Lazarus Group"          # save any search into a case
 astro case note brutus "Initial access via SSH brute force"
 astro case show brutus
-astro case export brutus --format md -o brutus      # md, json, stix, navigator
+astro case export brutus --format pdf -o brutus     # pdf, md, json, stix, navigator
 astro case list --all
 ```
 
 Cases keep the latest result of each indicator, so they can be resumed and
 re-searched later (`astro case search brutus --all`). Exports are marked with the
-case TLP; Markdown reports defang indicators and escape provider data, STIX
+case TLP: PDF reports print the TLP label at the top and bottom of every page,
+PDF and Markdown reports defang indicators (also inside notes) and escape
+provider data, STIX
 bundles use the OASIS TLP 2.0 markings, and Navigator layers highlight the case
 techniques plus those referenced by threat intel on its indicators.
 
@@ -104,11 +108,12 @@ astro token create web    # prints a token once: it is your password for the UI
 astro serve               # open http://127.0.0.1:8080 and sign in with the token
 ```
 
-Everything the CLI does is available in the browser: search (one indicator per
-line, extraction from pasted text or uploaded files, source selection, offline
-mode), IOC extraction with bulk actions, cases (create, add, search, notes, tags,
-edit, close, delete, export), dataset sync, source status and API token
-management.
+Everything the CLI does is available in the browser, in English or Italian:
+search (one indicator per line, extraction from pasted text or uploaded files,
+source selection, offline mode), IOC extraction with bulk actions, cases
+(create, add, search, notes, tags, edit, close, delete, export including PDF),
+dataset sync, provider API keys (save, test, remove), access tokens, and a
+built-in guide that explains every section and export format.
 
 The interface is rendered on the server and works without JavaScript; htmx is
 vendored (integrity-checked) for faster navigation. Sessions use HttpOnly,
@@ -158,6 +163,17 @@ HTTP action and branch on `verdict` (`malicious`, `suspicious`, `clean`), using
 `malicious` and `suspicious` to list the offending indicators.
 
 ## Configuration
+
+API keys can be managed in three places, in order of precedence: environment
+variables, keys saved with the web interface or `astro keys set` (stored in the
+owner-only database, never displayed again), and `config.toml`.
+
+```sh
+astro keys list              # where each key comes from
+astro keys set virustotal    # prompts without echo (or reads stdin)
+astro keys test virustotal   # harmless lookup on every provider using the key
+astro keys unset virustotal
+```
 
 astro reads its settings from `config.toml` in its data directory
 (`$ASTRO_DATA_DIR`, or `~/.config/astro` on Linux,
