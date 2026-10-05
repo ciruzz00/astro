@@ -344,6 +344,301 @@
           }
         }
       }
+    },
+    "/api/v1/cases": {
+      "get": {
+        "summary": "List cases",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Include closed cases."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a case",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "tlp": {
+                    "type": "string",
+                    "enum": [
+                      "clear",
+                      "green",
+                      "amber",
+                      "amber+strict",
+                      "red"
+                    ],
+                    "default": "amber"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseView"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{name}": {
+      "get": {
+        "summary": "Get a case with its indicators, last results and notes",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseView"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{name}/indicators": {
+      "post": {
+        "summary": "Add indicators to a case, optionally searching them",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "indicators": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Free text: indicators are extracted from it."
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "search": {
+                    "type": "boolean",
+                    "description": "Search the indicators not searched yet."
+                  },
+                  "only": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Query only these sources (see /providers)."
+                  },
+                  "offline": {
+                    "type": "boolean",
+                    "description": "Use only offline datasets: the indicator never leaves the server."
+                  },
+                  "no_cache": {
+                    "type": "boolean",
+                    "description": "Ignore cached results."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "added": {
+                      "type": "integer"
+                    },
+                    "given": {
+                      "type": "integer"
+                    },
+                    "searched": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{name}/export": {
+      "get": {
+        "summary": "Export a case",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "md",
+                "stix",
+                "navigator"
+              ],
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exported case (Markdown, JSON, STIX 2.1 bundle or ATT&CK Navigator layer)",
+            "content": {
+              "application/json": {},
+              "text/markdown": {}
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -569,6 +864,126 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Report"
+            }
+          }
+        }
+      },
+      "Case": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tlp": {
+            "type": "string",
+            "enum": [
+              "CLEAR",
+              "GREEN",
+              "AMBER",
+              "AMBER+STRICT",
+              "RED"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CaseSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Case"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "indicators": {
+                "type": "integer"
+              },
+              "malicious": {
+                "type": "integer"
+              },
+              "suspicious": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "CaseView": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/Case"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "indicator": {
+                  "$ref": "#/components/schemas/Indicator"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "$ref": "#/components/schemas/Verdict"
+                },
+                "report": {
+                  "$ref": "#/components/schemas/Report"
+                },
+                "searched_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "added_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
             }
           }
         }

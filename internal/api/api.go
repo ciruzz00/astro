@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/ciruzz00/astro/internal/cases"
 	"github.com/ciruzz00/astro/internal/engine"
 	"github.com/ciruzz00/astro/internal/ioc"
 	"github.com/ciruzz00/astro/internal/provider"
@@ -53,11 +54,13 @@ type Verifier interface {
 
 // Config holds the dependencies of the API.
 type Config struct {
-	Engine  *engine.Engine
-	Sources []Source
-	Tokens  Verifier
-	Version string
-	Logger  *slog.Logger
+	Engine        *engine.Engine
+	Cases         *cases.Service
+	Sources       []Source
+	Tokens        Verifier
+	Version       string
+	AttackVersion string
+	Logger        *slog.Logger
 }
 
 type server struct {
@@ -80,6 +83,7 @@ func NewHandler(cfg Config) http.Handler {
 	mux.Handle("POST /api/v1/search", s.auth(s.searchPost))
 	mux.Handle("POST /api/v1/extract", s.auth(s.extract))
 	mux.Handle("POST /api/v1/enrich", s.auth(s.enrich))
+	s.routeCases(mux)
 	return s.recoverer(securityHeaders(s.logRequests(jsonMuxErrors(mux))))
 }
 

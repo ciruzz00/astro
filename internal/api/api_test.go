@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ciruzz00/astro/internal/cases"
 	"github.com/ciruzz00/astro/internal/engine"
 	"github.com/ciruzz00/astro/internal/ioc"
 	"github.com/ciruzz00/astro/internal/provider"
@@ -48,8 +50,15 @@ func (f fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Resu
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	providers := []provider.Provider{fakeProvider{name: "online"}, fakeProvider{name: "local", local: true}}
+	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "astro.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	eng := engine.New(providers)
 	h := NewHandler(Config{
-		Engine: engine.New(providers),
+		Engine: eng,
+		Cases:  cases.New(st, eng),
 		Sources: []Source{
 			{Name: "online", Enabled: true},
 			{Name: "local", Enabled: true, Offline: true},
@@ -233,12 +242,16 @@ func TestOpenAPIMatchesRoutes(t *testing.T) {
 		t.Fatalf("openapi.json is not valid JSON: %v", err)
 	}
 	want := map[string][]string{
-		"/api/v1/health":       {"get"},
-		"/api/v1/openapi.json": {"get"},
-		"/api/v1/providers":    {"get"},
-		"/api/v1/search":       {"get", "post"},
-		"/api/v1/extract":      {"post"},
-		"/api/v1/enrich":       {"post"},
+		"/api/v1/health":                  {"get"},
+		"/api/v1/openapi.json":            {"get"},
+		"/api/v1/providers":               {"get"},
+		"/api/v1/search":                  {"get", "post"},
+		"/api/v1/extract":                 {"post"},
+		"/api/v1/enrich":                  {"post"},
+		"/api/v1/cases":                   {"get", "post"},
+		"/api/v1/cases/{name}":            {"get"},
+		"/api/v1/cases/{name}/indicators": {"post"},
+		"/api/v1/cases/{name}/export":     {"get"},
 	}
 	if len(spec.Paths) != len(want) {
 		t.Errorf("spec has %d paths, handlers %d", len(spec.Paths), len(want))
@@ -248,6 +261,56 @@ func TestOpenAPIMatchesRoutes(t *testing.T) {
 			if _, ok := spec.Paths[path][m]; !ok {
 				t.Errorf("spec is missing %s %s", strings.ToUpper(m), path)
 			}
+		}
+	}
+}
+
+func TestCases(t *testing.T) {
+	srv := newTestServer(t)
+
+	resp, body := do(t, srv, "POST", "/api/v1/cases", goodToken, `{"name":"inc-42","title":"Phishing","tlp":"red","tags":["soc"]}`)
+	if resp.StatusCode != 201 || !strings.Contains(body, `"tlp":"RED"`) {
+		t.Fatalf("create: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := do(t, srv, "POST", "/api/v1/cases", goodToken, `{"name":"inc-42"}`); resp.StatusCode != 409 {
+		t.Errorf("duplicate: status %d", resp.StatusCode)
+	}
+
+	resp, body = do(t, srv, "POST", "/api/v1/cases/inc-42/indicators", goodToken,
+		`{"text":"mail from 198.51.100.7 linking hxxps://evil[.]example[.]com","indicators":["T1566.001"],"search":true}`)
+	if resp.StatusCode != 200 || body != `{"added":3,"given":3,"searched":3}`+"\n" {
+		t.Fatalf("add: %d %s", resp.StatusCode, body)
+	}
+
+	resp, body = do(t, srv, "GET", "/api/v1/cases/inc-42", goodToken, "")
+	var v cases.View
+	if resp.StatusCode != 200 || json.Unmarshal([]byte(body), &v) != nil || len(v.Items) != 3 || v.Items[1].Verdict != provider.VerdictMalicious {
+		t.Errorf("get: %d %s", resp.StatusCode, body)
+	}
+
+	resp, body = do(t, srv, "GET", "/api/v1/cases", goodToken, "")
+	if resp.StatusCode != 200 || !strings.Contains(body, `"malicious":1`) {
+		t.Errorf("list: %s", body)
+	}
+
+	resp, body = do(t, srv, "GET", "/api/v1/cases/inc-42/export?format=md", goodToken, "")
+	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/markdown") ||
+		resp.Header.Get("Content-Disposition") != `attachment; filename="inc-42.md"` || !strings.Contains(body, "TLP:RED") {
+		t.Errorf("export md: %d %v", resp.StatusCode, resp.Header)
+	}
+	if resp, body := do(t, srv, "GET", "/api/v1/cases/inc-42/export?format=stix", goodToken, ""); resp.StatusCode != 200 || !strings.Contains(body, `"type": "bundle"`) {
+		t.Errorf("export stix: %d", resp.StatusCode)
+	}
+
+	for path, status := range map[string]int{
+		"/api/v1/cases/nope":                   404,
+		"/api/v1/cases/nope/export":            404,
+		"/api/v1/cases/inc-42/export?format=x": 400,
+		"/api/v1/cases/..%2Fetc":               400,
+		"/api/v1/cases/a%20b":                  400,
+	} {
+		if resp, body := do(t, srv, "GET", path, goodToken, ""); resp.StatusCode != status {
+			t.Errorf("GET %s: %d, want %d (%s)", path, resp.StatusCode, status, body)
 		}
 	}
 }

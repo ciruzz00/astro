@@ -60,11 +60,13 @@ with 'astro token create'. The server listens on localhost only unless
 			}
 
 			srv := api.NewHTTPServer(addr, api.NewHandler(api.Config{
-				Engine:  a.engine,
-				Sources: a.apiSources(),
-				Tokens:  auth.NewManager(a.store),
-				Version: version,
-				Logger:  logger,
+				Engine:        a.engine,
+				Cases:         a.cases,
+				Sources:       a.apiSources(),
+				Tokens:        auth.NewManager(a.store),
+				Version:       version,
+				AttackVersion: a.attackVersion(cmd.Context()),
+				Logger:        logger,
 			}))
 			srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 			return run(cmd.Context(), srv, certFile, keyFile, logger)
