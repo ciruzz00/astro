@@ -13,7 +13,7 @@ import (
 )
 
 // Formats lists the supported export formats.
-var Formats = []string{"json", "md", "stix", "navigator"}
+var Formats = []string{"pdf", "md", "json", "stix", "navigator"}
 
 // Options tunes an export.
 type Options struct {
@@ -34,6 +34,8 @@ func Write(w io.Writer, format string, v *cases.View, o Options) error {
 	switch strings.ToLower(format) {
 	case "json":
 		return writeJSON(w, v)
+	case "pdf":
+		return PDF(w, v, o)
 	case "md", "markdown":
 		return Markdown(w, v, o)
 	case "stix":
@@ -47,6 +49,8 @@ func Write(w io.Writer, format string, v *cases.View, o Options) error {
 // Extension returns the usual file extension of a format.
 func Extension(format string) string {
 	switch strings.ToLower(format) {
+	case "pdf":
+		return ".pdf"
 	case "md", "markdown":
 		return ".md"
 	case "stix":
@@ -55,6 +59,17 @@ func Extension(format string) string {
 		return ".layer.json"
 	}
 	return ".json"
+}
+
+// ContentType returns the MIME type of a format.
+func ContentType(format string) string {
+	switch Extension(format) {
+	case ".pdf":
+		return "application/pdf"
+	case ".md":
+		return "text/markdown; charset=utf-8"
+	}
+	return "application/json"
 }
 
 func writeJSON(w io.Writer, v any) error {

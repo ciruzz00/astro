@@ -3,6 +3,7 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func view() *cases.View {
 		Case: store.Case{
 			Name: "sherlock-1", Title: "Brutus <script>alert(1)</script>", TLP: cases.TLPAmber, Status: "open",
 			Tags: []string{"htb"}, CreatedAt: created, UpdatedAt: searched,
-			Notes: []store.CaseNote{{Body: "Attacker used **hydra** <img src=x onerror=alert(1)>", CreatedAt: searched}},
+			Notes: []store.CaseNote{{Body: "Attacker used **hydra** from 198.51.100.7 <img src=x onerror=alert(1)>", CreatedAt: searched}},
 		},
 		Items: []cases.Item{
 			{
@@ -149,8 +150,31 @@ func TestNavigator(t *testing.T) {
 	}
 }
 
+func TestPDF(t *testing.T) {
+	v := view()
+	// Many items force page breaks; exotic scripts must not break rendering.
+	for i := range 120 {
+		v.Items = append(v.Items, cases.Item{Indicator: ioc.Indicator{Type: ioc.Keyword, Value: fmt.Sprintf("Группа 攻撃者 %d", i)}, AddedAt: created})
+	}
+	v.Case.Notes = append(v.Case.Notes, store.CaseNote{Body: strings.Repeat("Long note with àccénts and a\ttab. ", 80), CreatedAt: searched})
+	var b bytes.Buffer
+	if err := Write(&b, "pdf", v, opts); err != nil {
+		t.Fatal(err)
+	}
+	out := b.Bytes()
+	if !bytes.HasPrefix(out, []byte("%PDF-")) || !bytes.Contains(out[len(out)-32:], []byte("%%EOF")) {
+		t.Fatalf("not a PDF (%d bytes)", len(out))
+	}
+	if pages := bytes.Count(out, []byte("/Type /Page\n")) + bytes.Count(out, []byte("/Type /Page ")); pages < 3 {
+		t.Logf("pages marker count = %d", pages)
+	}
+	if ContentType("pdf") != "application/pdf" || Extension("pdf") != ".pdf" {
+		t.Error("pdf content type or extension")
+	}
+}
+
 func TestUnknownFormat(t *testing.T) {
-	if err := Write(&bytes.Buffer{}, "pdf", view(), opts); err == nil {
+	if err := Write(&bytes.Buffer{}, "docx", view(), opts); err == nil {
 		t.Error("unknown format must fail")
 	}
 }

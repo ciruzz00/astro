@@ -31,7 +31,7 @@ func Markdown(w io.Writer, v *cases.View, o Options) error {
 	fmt.Fprintf(b, "| Updated | %s |\n", c.UpdatedAt.Format("2006-01-02 15:04 UTC"))
 	fmt.Fprintf(b, "| Generated | %s by astro %s |\n\n", o.Now.Format("2006-01-02 15:04 UTC"), md(o.Version))
 	if c.Description != "" {
-		fmt.Fprintf(b, "%s\n\n", md(c.Description))
+		fmt.Fprintf(b, "%s\n\n", md(ioc.DefangText(c.Description)))
 	}
 
 	mal, sus, clean, pending := v.Counts()
@@ -42,7 +42,7 @@ func Markdown(w io.Writer, v *cases.View, o Options) error {
 		fmt.Fprintf(b, "## Indicators\n\n| Indicator | Type | Verdict | Flagged by | Note |\n|---|---|---|---|---|\n")
 		for _, it := range v.Items {
 			fmt.Fprintf(b, "| `%s` | %s | %s | %s | %s |\n",
-				code(ioc.Defang(it.Indicator)), it.Indicator.Type, verdictLabel(it), md(strings.Join(flaggedBy(it), ", ")), md(it.Note))
+				code(ioc.Defang(it.Indicator)), it.Indicator.Type, verdictLabel(it), md(strings.Join(flaggedBy(it), ", ")), md(ioc.DefangText(it.Note)))
 		}
 		b.WriteString("\n## Details\n")
 		for _, it := range v.Items {
@@ -73,7 +73,7 @@ func Markdown(w io.Writer, v *cases.View, o Options) error {
 		for _, n := range c.Notes {
 			// Notes are the analyst's own Markdown: keep the formatting but
 			// strip control characters and raw HTML.
-			fmt.Fprintf(b, "\n**%s**\n\n%s\n", n.CreatedAt.Format("2006-01-02 15:04 UTC"), noHTML(render.Sanitize(n.Body)))
+			fmt.Fprintf(b, "\n**%s**\n\n%s\n", n.CreatedAt.Format("2006-01-02 15:04 UTC"), noHTML(render.Sanitize(ioc.DefangText(n.Body))))
 		}
 	}
 	fmt.Fprintf(b, "\n---\n*TLP:%s. Indicators are defanged.*\n", c.TLP)
