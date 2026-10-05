@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ciruzz00/astro/internal/cases"
 	"github.com/ciruzz00/astro/internal/config"
 	"github.com/ciruzz00/astro/internal/engine"
 	"github.com/ciruzz00/astro/internal/httpx"
@@ -33,6 +34,7 @@ type app struct {
 	client  *http.Client
 	sources []source
 	engine  *engine.Engine
+	cases   *cases.Service
 }
 
 // keyNeed says whether a source needs an API key.
@@ -82,6 +84,7 @@ func openApp(ctx context.Context, g *globalFlags) (*app, error) {
 		}
 	}
 	a.engine = engine.New(enabled, engine.WithCache(st), engine.WithTimeout(cfg.HTTPTimeout+10*time.Second))
+	a.cases = cases.New(st, a.engine)
 	return a, nil
 }
 
@@ -117,6 +120,20 @@ func (a *app) localNames() []string {
 }
 
 func (a *app) Close() error { return a.store.Close() }
+
+// attackVersion returns the synced ATT&CK enterprise version, if any.
+func (a *app) attackVersion(ctx context.Context) string {
+	ds, err := a.store.Datasets(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, d := range ds {
+		if d.Name == "attack-enterprise" {
+			return d.Version
+		}
+	}
+	return ""
+}
 
 // style enables colors only on an interactive terminal, honoring NO_COLOR.
 func style(w io.Writer, g *globalFlags) render.Style {

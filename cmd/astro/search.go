@@ -18,11 +18,10 @@ const maxInput = 32 << 20
 
 func newSearchCmd(g *globalFlags) *cobra.Command {
 	var (
-		asJSON  bool
-		noCache bool
-		offline bool
-		only    []string
-		file    string
+		asJSON   bool
+		file     string
+		caseName string
+		sf       searchFlags
 	)
 	cmd := &cobra.Command{
 		Use:   "search [indicator...]",
@@ -39,7 +38,8 @@ for sensitive indicators that must not leave this machine.`,
   astro search 00:50:56:aa:bb:cc
   astro search --file incident.log --json
   astro search --offline 10.0.0.5
-  astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f`,
+  astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f
+  astro search --case sherlock-1 -f notes.txt`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inds, err := collectIndicators(cmd, args, file)
 			if err != nil {
@@ -51,13 +51,17 @@ for sensitive indicators that must not leave this machine.`,
 			}
 			defer a.Close()
 
-			opts := engine.SearchOptions{NoCache: noCache, Only: only}
-			if offline {
-				opts.Only = a.localNames()
-			} else if err := checkOnly(a, only); err != nil {
+			opts, err := a.searchOptions(sf)
+			if err != nil {
 				return err
 			}
 			reports := a.engine.SearchMany(cmd.Context(), inds, opts)
+			if caseName != "" {
+				if err := a.cases.Record(cmd.Context(), caseName, reports); err != nil {
+					return caseError(caseName, err)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "results saved to case %s\n", caseName)
+			}
 			out := cmd.OutOrStdout()
 			if asJSON {
 				return render.JSON(out, reports)
@@ -72,12 +76,34 @@ for sensitive indicators that must not leave this machine.`,
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print results as JSON")
-	cmd.Flags().BoolVar(&noCache, "no-cache", false, "ignore cached results and query the sources again")
 	cmd.Flags().StringVarP(&file, "file", "f", "", `extract indicators from a file ("-" for stdin)`)
-	cmd.Flags().BoolVar(&offline, "offline", false, "use only offline datasets: nothing leaves this machine")
-	cmd.Flags().StringSliceVar(&only, "only", nil, "comma-separated sources to query (see 'astro providers')")
-	cmd.MarkFlagsMutuallyExclusive("offline", "only")
+	cmd.Flags().StringVar(&caseName, "case", "", "save the results into this case")
+	sf.register(cmd)
 	return cmd
+}
+
+// searchFlags are the source selection flags shared by search commands.
+type searchFlags struct {
+	noCache bool
+	offline bool
+	only    []string
+}
+
+func (f *searchFlags) register(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&f.noCache, "no-cache", false, "ignore cached results and query the sources again")
+	cmd.Flags().BoolVar(&f.offline, "offline", false, "use only offline datasets: nothing leaves this machine")
+	cmd.Flags().StringSliceVar(&f.only, "only", nil, "comma-separated sources to query (see 'astro providers')")
+	cmd.MarkFlagsMutuallyExclusive("offline", "only")
+}
+
+// searchOptions validates the flags against the configured sources.
+func (a *app) searchOptions(f searchFlags) (engine.SearchOptions, error) {
+	opts := engine.SearchOptions{NoCache: f.noCache, Only: f.only}
+	if f.offline {
+		opts.Only = a.localNames()
+		return opts, nil
+	}
+	return opts, checkOnly(a, f.only)
 }
 
 // checkOnly validates --only against the known and enabled sources.
