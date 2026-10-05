@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -67,6 +68,8 @@ type Report struct {
 // SearchOptions tunes a single search.
 type SearchOptions struct {
 	NoCache bool
+	// Only restricts the search to these provider names; empty means all.
+	Only []string
 }
 
 // Search queries every supporting provider concurrently.
@@ -74,7 +77,7 @@ func (e *Engine) Search(ctx context.Context, ind ioc.Indicator, opts SearchOptio
 	start := e.now()
 	var selected []provider.Provider
 	for _, p := range e.providers {
-		if p.Supports(ind.Type) {
+		if p.Supports(ind.Type) && (len(opts.Only) == 0 || slices.Contains(opts.Only, p.Name())) {
 			selected = append(selected, p)
 		}
 	}

@@ -38,6 +38,13 @@ const (
 	Keyword Type = "keyword"
 )
 
+// Types lists every indicator type, in display order.
+var Types = []Type{
+	MD5, SHA1, SHA256, SHA512, IPv4, IPv6, Domain, URL, Email, CVE,
+	AttackTechnique, AttackTactic, AttackGroup, AttackSoftware, AttackMitigation, AttackCampaign,
+	MAC, Keyword,
+}
+
 // IsHash reports whether t is a file hash type.
 func (t Type) IsHash() bool {
 	return t == MD5 || t == SHA1 || t == SHA256 || t == SHA512

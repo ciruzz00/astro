@@ -20,6 +20,8 @@ func newSearchCmd(g *globalFlags) *cobra.Command {
 	var (
 		asJSON  bool
 		noCache bool
+		offline bool
+		only    []string
 		file    string
 	)
 	cmd := &cobra.Command{
@@ -28,11 +30,16 @@ func newSearchCmd(g *globalFlags) *cobra.Command {
 		Long: `Search one or more indicators. The type is detected automatically and
 defanged input (hxxps://evil[.]com) is accepted. Quote multi-word names.
 
-With --file, every indicator found in the file (or stdin with "-") is searched.`,
+With --file, every indicator found in the file (or stdin with "-") is searched.
+
+Online sources receive the indicator you search: use --offline (or --only)
+for sensitive indicators that must not leave this machine.`,
 		Example: `  astro search 44d88612fea8a8f36de82e1278abb02f
   astro search CVE-2021-44228 T1059.001 "Lazarus Group"
   astro search 00:50:56:aa:bb:cc
-  astro search --file incident.log --json`,
+  astro search --file incident.log --json
+  astro search --offline 10.0.0.5
+  astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			inds, err := collectIndicators(cmd, args, file)
 			if err != nil {
@@ -44,7 +51,13 @@ With --file, every indicator found in the file (or stdin with "-") is searched.`
 			}
 			defer a.Close()
 
-			reports := a.engine.SearchMany(cmd.Context(), inds, engine.SearchOptions{NoCache: noCache})
+			opts := engine.SearchOptions{NoCache: noCache, Only: only}
+			if offline {
+				opts.Only = a.localNames()
+			} else if err := checkOnly(a, only); err != nil {
+				return err
+			}
+			reports := a.engine.SearchMany(cmd.Context(), inds, opts)
 			out := cmd.OutOrStdout()
 			if asJSON {
 				return render.JSON(out, reports)
@@ -61,7 +74,30 @@ With --file, every indicator found in the file (or stdin with "-") is searched.`
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print results as JSON")
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "ignore cached results and query the sources again")
 	cmd.Flags().StringVarP(&file, "file", "f", "", `extract indicators from a file ("-" for stdin)`)
+	cmd.Flags().BoolVar(&offline, "offline", false, "use only offline datasets: nothing leaves this machine")
+	cmd.Flags().StringSliceVar(&only, "only", nil, "comma-separated sources to query (see 'astro providers')")
+	cmd.MarkFlagsMutuallyExclusive("offline", "only")
 	return cmd
+}
+
+// checkOnly validates --only against the known and enabled sources.
+func checkOnly(a *app, only []string) error {
+	for _, name := range only {
+		found := false
+		for _, s := range a.sources {
+			if s.provider.Name() != name {
+				continue
+			}
+			found = true
+			if !s.enabled() {
+				return fmt.Errorf("source %q is disabled: set %s", name, s.keyEnv)
+			}
+		}
+		if !found {
+			return fmt.Errorf("unknown source %q: run 'astro providers' for the list", name)
+		}
+	}
+	return nil
 }
 
 func collectIndicators(cmd *cobra.Command, args []string, file string) ([]ioc.Indicator, error) {

@@ -63,6 +63,7 @@ MAC addresses and threat names across many intelligence sources at once.`,
 		newSearchCmd(g),
 		newExtractCmd(),
 		newSyncCmd(g),
+		newProvidersCmd(g),
 		newVersionCmd(),
 	)
 	return root
