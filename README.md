@@ -7,8 +7,8 @@ detected automatically and looked up across many intelligence feeds at once.
 Built for incident response, threat hunting and CTF/DFIR challenges
 (Hack The Box Sherlocks, TryHackMe).
 
-> **Status:** early development. The CLI and all the sources below work;
-> REST API, web UI, TUI, cases and PDF reports are on the roadmap.
+> **Status:** early development. The CLI, the REST API and all the sources below
+> work; web UI, TUI, cases and PDF reports are on the roadmap.
 
 ## Features
 
@@ -76,6 +76,42 @@ astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f
 astro providers                              # enabled sources and missing keys
 ```
 
+## REST API
+
+```sh
+astro token create soar          # prints the token once: store it safely
+astro serve                      # http://127.0.0.1:8080, localhost only
+```
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/v1/health` | liveness (no token) |
+| `GET /api/v1/openapi.json` | OpenAPI 3.1 spec (no token) |
+| `GET /api/v1/providers` | sources and whether they are enabled |
+| `GET /api/v1/search?q=<indicator>` | search one indicator (`only`, `offline`, `no_cache`) |
+| `POST /api/v1/search` | search up to 100 indicators |
+| `POST /api/v1/extract` | extract indicators from text |
+| `POST /api/v1/enrich` | extract from an alert or text, search, and return an overall verdict |
+
+```sh
+curl -H "Authorization: Bearer $ASTRO_TOKEN" "http://127.0.0.1:8080/api/v1/search?q=8.8.8.8"
+curl -H "Authorization: Bearer $ASTRO_TOKEN" -H "Content-Type: application/json" \
+     -d '{"text":"beacon to hxxps://evil[.]example[.]com from 203.0.113.7"}' \
+     http://127.0.0.1:8080/api/v1/enrich
+```
+
+Tokens are 256-bit random values stored only as SHA-256 hashes; manage them with
+`astro token list` and `astro token revoke <name>`. Requests are rate limited per
+token and bodies are capped at 1 MB. To expose the API beyond localhost pass
+`--allow-remote` and serve it over TLS (`--tls-cert`/`--tls-key` or a reverse proxy).
+
+### SOAR / EDR integration
+
+`/enrich` is designed for automation. For example, a SentinelOne Singularity
+Hyperautomation workflow (or any SOAR) can send the alert JSON as `text` with an
+HTTP action and branch on `verdict` (`malicious`, `suspicious`, `clean`), using
+`malicious` and `suspicious` to list the offending indicators.
+
 ## Configuration
 
 astro reads its settings from `config.toml` in its data directory
@@ -129,6 +165,8 @@ make help     # list targets
 make test     # go test -race
 make check    # verify, vet, staticcheck, gosec, govulncheck, tests
 make run ARGS="search CVE-2021-44228"
+make token NAME=soar   # create an API token
+make serve    # REST API on http://127.0.0.1:8080
 make cross    # release archives for every OS/arch in dist/
 make clean    # remove containers and build output
 ```
