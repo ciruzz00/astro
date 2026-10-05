@@ -25,6 +25,13 @@ services:
       - path: .env
         required: false
 
+  # REST API (make serve), published on the host loopback only.
+  api:
+    extends: cli
+    command: sh -c 'go build -trimpath -o /home/dev/bin/astro ./cmd/astro && exec /home/dev/bin/astro serve --addr 0.0.0.0:8080 --allow-remote'
+    ports:
+      - "127.0.0.1:8080:8080"
+
 volumes:
   gomod:
     name: astro-gomod
