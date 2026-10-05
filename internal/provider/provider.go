@@ -3,9 +3,13 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/ciruzz00/astro/internal/ioc"
 )
@@ -93,6 +97,46 @@ func List(items []string, max int) string {
 		return strings.Join(items, ", ")
 	}
 	return fmt.Sprintf("%s (+%d more)", strings.Join(items[:max], ", "), len(items)-max)
+}
+
+// ErrRateLimited is returned when a local rate limiter cannot grant a request
+// before the lookup deadline, to stay within a provider's free-tier quota.
+var ErrRateLimited = errors.New("local rate limit reached to respect the provider quota: retry later")
+
+// Wait blocks until the limiter allows a request or the context ends.
+func Wait(ctx context.Context, l *rate.Limiter) error {
+	if err := l.Wait(ctx); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return ErrRateLimited
+	}
+	return nil
+}
+
+// FlexInt decodes integers that some APIs send as JSON strings.
+type FlexInt int64
+
+func (f *FlexInt) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("not an integer: %s", b)
+	}
+	*f = FlexInt(n)
+	return nil
+}
+
+// UnixDate formats a Unix timestamp as YYYY-MM-DD, or "" for zero.
+func UnixDate(sec int64) string {
+	if sec <= 0 {
+		return ""
+	}
+	return time.Unix(sec, 0).UTC().Format("2006-01-02")
 }
 
 // Truncate shortens s to at most n runes.
