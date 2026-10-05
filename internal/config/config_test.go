@@ -31,7 +31,17 @@ func TestSecretNeverLeaks(t *testing.T) {
 	}
 }
 
+// clearEnv unsets every key variable so a developer's real keys can never
+// influence (or be printed by) these tests.
+func clearEnv(t *testing.T) {
+	t.Helper()
+	for name := range envKeys {
+		t.Setenv(name, "")
+	}
+}
+
 func TestLoadFileAndEnv(t *testing.T) {
+	clearEnv(t)
 	dir := t.TempDir()
 	conf := "http_timeout = \"5s\"\n[keys]\nvirustotal = \"from-file\"\nnvd = \"nvd-file\"\n"
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(conf), 0o600); err != nil {
@@ -46,11 +56,12 @@ func TestLoadFileAndEnv(t *testing.T) {
 	if cfg.HTTPTimeout != 5*time.Second {
 		t.Errorf("HTTPTimeout = %v", cfg.HTTPTimeout)
 	}
+	// Never print key values in failures: they could be real secrets.
 	if cfg.Keys.VirusTotal.Reveal() != "from-file" {
-		t.Errorf("VirusTotal key = %q", cfg.Keys.VirusTotal.Reveal())
+		t.Error("VirusTotal key was not read from the config file")
 	}
 	if cfg.Keys.NVD.Reveal() != "nvd-env" {
-		t.Errorf("env must override file, got %q", cfg.Keys.NVD.Reveal())
+		t.Error("environment must override the config file")
 	}
 	if cfg.Keys.Shodan.IsSet() {
 		t.Error("Shodan key should be unset")
@@ -75,6 +86,7 @@ func TestLoadRejectsWorldReadableFile(t *testing.T) {
 }
 
 func TestLoadDefaults(t *testing.T) {
+	clearEnv(t)
 	cfg, err := Load(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
