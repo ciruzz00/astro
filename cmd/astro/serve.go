@@ -66,7 +66,7 @@ token created with 'astro token create'. The server listens on localhost only un
 			apiHandler := api.NewHandler(api.Config{
 				Engine:        a.engine,
 				Cases:         a.cases,
-				Sources:       a.apiSources(),
+				Sources:       a.apiSources,
 				Tokens:        auth.NewManager(a.store),
 				Version:       version,
 				AttackVersion: a.attackVersion(cmd.Context()),
@@ -80,7 +80,8 @@ token created with 'astro token create'. The server listens on localhost only un
 					Cases:   a.cases,
 					Store:   a.store,
 					Tokens:  auth.NewManager(a.store),
-					Sources: a.apiSources(),
+					Sources: a.apiSources,
+					Keys:    a,
 					Fetcher: datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
 					Version: version,
 					Secure:  certFile != "",
@@ -234,8 +235,9 @@ func when(t *time.Time) string {
 
 // apiSources describes the sources for the API's /providers endpoint.
 func (a *app) apiSources() []api.Source {
-	out := make([]api.Source, 0, len(a.sources))
-	for _, s := range a.sources {
+	sources := a.currentSources()
+	out := make([]api.Source, 0, len(sources))
+	for _, s := range sources {
 		src := api.Source{
 			Name:       s.provider.Name(),
 			Enabled:    s.enabled(),

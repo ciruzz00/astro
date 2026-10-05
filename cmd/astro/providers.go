@@ -24,7 +24,7 @@ func newProvidersCmd(g *globalFlags) *cobra.Command {
 
 			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 4, 2, ' ', 0)
 			fmt.Fprintln(tw, "SOURCE\tSTATUS\tWHERE\tINDICATORS")
-			for _, s := range a.sources {
+			for _, s := range a.currentSources() {
 				status := "enabled"
 				switch {
 				case !s.enabled():

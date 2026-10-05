@@ -110,7 +110,7 @@ func (a *app) searchOptions(f searchFlags) (engine.SearchOptions, error) {
 func checkOnly(a *app, only []string) error {
 	for _, name := range only {
 		found := false
-		for _, s := range a.sources {
+		for _, s := range a.currentSources() {
 			if s.provider.Name() != name {
 				continue
 			}

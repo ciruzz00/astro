@@ -29,7 +29,7 @@ an ATT&CK Navigator layer.`,
   astro case add sherlock-brutus -f auth.log --search
   astro case note sherlock-brutus "Initial access via SSH brute force"
   astro case show sherlock-brutus
-  astro case export sherlock-brutus --format md -o brutus.md`,
+  astro case export sherlock-brutus --format pdf -o brutus.pdf`,
 	}
 	cmd.AddCommand(
 		caseNewCmd(g), caseListCmd(g), caseShowCmd(g), caseAddCmd(g), caseSearchCmd(g),
@@ -386,8 +386,9 @@ func caseExportCmd(g *globalFlags) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "export <name>",
-		Short: "Export a case (md, json, stix, navigator)",
-		Long: `Export a case. Markdown is a readable report with defanged indicators,
+		Short: "Export a case (pdf, md, json, stix, navigator)",
+		Long: `Export a case. pdf is a printable report with the TLP label on every page,
+Markdown is a readable report with defanged indicators,
 stix is a STIX 2.1 bundle marked with the case TLP, navigator is a MITRE
 ATT&CK Navigator layer. Files are written with owner-only permissions.`,
 		Args: cobra.ExactArgs(1),
@@ -398,6 +399,9 @@ ATT&CK Navigator layer. Files are written with owner-only permissions.`,
 			}
 			opts := report.Options{Version: version, AttackVersion: a.attackVersion(cmd.Context())}
 			if output == "" {
+				if report.Extension(format) == ".pdf" && isTerminal(cmd.OutOrStdout()) {
+					return errors.New("a PDF cannot be printed to the terminal: use -o <file>")
+				}
 				return report.Write(cmd.OutOrStdout(), format, v, opts)
 			}
 			if filepath.Ext(output) == "" {
@@ -425,7 +429,7 @@ ATT&CK Navigator layer. Files are written with owner-only permissions.`,
 			return nil
 		}),
 	}
-	cmd.Flags().StringVar(&format, "format", "md", "md, json, stix or navigator")
+	cmd.Flags().StringVar(&format, "format", "md", "pdf, md, json, stix or navigator")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "output file (default stdout)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite the output file")
 	return cmd

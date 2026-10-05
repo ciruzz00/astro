@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ciruzz00/astro/internal/cases"
@@ -29,12 +30,17 @@ import (
 
 // app holds the shared dependencies of the commands.
 type app struct {
-	cfg     *config.Config
-	store   *store.Store
-	client  *http.Client
-	sources []source
-	engine  *engine.Engine
-	cases   *cases.Service
+	cfg    *config.Config
+	store  *store.Store
+	client *http.Client
+	engine *engine.Engine
+	cases  *cases.Service
+
+	// mu guards the fields below, rebuilt by reload when API keys change.
+	mu        sync.RWMutex
+	sources   []source
+	keys      config.Keys
+	keyOrigin map[string]string
 }
 
 // keyNeed says whether a source needs an API key.
@@ -49,6 +55,7 @@ const (
 // source is a provider plus what it needs to run.
 type source struct {
 	provider provider.Provider
+	keyName  string // config.KeyDef name
 	keyEnv   string
 	key      config.Secret
 	need     keyNeed
@@ -75,23 +82,61 @@ func openApp(ctx context.Context, g *globalFlags) (*app, error) {
 		return nil, err
 	}
 	a := &app{cfg: cfg, store: st, client: httpx.NewClient(cfg.HTTPTimeout)}
-	a.sources = a.allSources()
+	a.engine = engine.New(nil, engine.WithCache(st), engine.WithTimeout(cfg.HTTPTimeout+10*time.Second))
+	a.cases = cases.New(st, a.engine)
+	if err := a.reload(ctx); err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+	return a, nil
+}
 
+// reload resolves the API keys (environment, then database, then config
+// file) and rebuilds the sources and the engine providers.
+func (a *app) reload(ctx context.Context) error {
+	stored, err := a.store.ProviderKeys(ctx)
+	if err != nil {
+		return err
+	}
+	keys := a.cfg.Keys
+	origin := map[string]string{}
+	for _, d := range config.KeyDefs {
+		fileOrEnv := a.cfg.KeyOrigin[d.Name]
+		switch k, inDB := stored[d.Name]; {
+		case fileOrEnv == config.OriginEnv:
+			origin[d.Name] = config.OriginEnv
+		case inDB:
+			*d.Field(&keys) = config.Secret(k.Value)
+			origin[d.Name] = config.OriginDatabase
+		case fileOrEnv == config.OriginFile:
+			origin[d.Name] = config.OriginFile
+		}
+	}
+	sources := a.allSources(keys)
 	var enabled []provider.Provider
-	for _, s := range a.sources {
+	for _, s := range sources {
 		if s.enabled() {
 			enabled = append(enabled, s.provider)
 		}
 	}
-	a.engine = engine.New(enabled, engine.WithCache(st), engine.WithTimeout(cfg.HTTPTimeout+10*time.Second))
-	a.cases = cases.New(st, a.engine)
-	return a, nil
+	a.mu.Lock()
+	a.sources, a.keys, a.keyOrigin = sources, keys, origin
+	a.mu.Unlock()
+	a.engine.SetProviders(enabled)
+	return nil
+}
+
+// currentSources returns a snapshot of the sources.
+func (a *app) currentSources() []source {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return append([]source(nil), a.sources...)
 }
 
 // allSources lists every source in display order, enabled or not.
-func (a *app) allSources() []source {
-	c, k := a.client, a.cfg.Keys
-	return []source{
+func (a *app) allSources(k config.Keys) []source {
+	c := a.client
+	out := []source{
 		{provider: attack.New(a.store), local: true},
 		{provider: virustotal.New(c, virustotal.DefaultBase, k.VirusTotal), keyEnv: "ASTRO_VIRUSTOTAL_KEY", key: k.VirusTotal, need: keyRequired},
 		{provider: abusech.NewMalwareBazaar(c, abusech.MalwareBazaarBase, k.AbuseCH), keyEnv: "ASTRO_ABUSECH_KEY", key: k.AbuseCH, need: keyRequired},
@@ -106,12 +151,21 @@ func (a *app) allSources() []source {
 		{provider: epss.New(c, epss.DefaultBase)},
 		{provider: oui.New(a.store), local: true},
 	}
+	// Record which configurable key each source uses.
+	for i := range out {
+		for _, d := range config.KeyDefs {
+			if out[i].keyEnv == d.Env {
+				out[i].keyName = d.Name
+			}
+		}
+	}
+	return out
 }
 
 // localNames returns the names of the sources that work offline.
 func (a *app) localNames() []string {
 	var out []string
-	for _, s := range a.sources {
+	for _, s := range a.currentSources() {
 		if s.local {
 			out = append(out, s.provider.Name())
 		}
@@ -135,15 +189,20 @@ func (a *app) attackVersion(ctx context.Context) string {
 	return ""
 }
 
+// isTerminal reports whether w is an interactive terminal.
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
 // style enables colors only on an interactive terminal, honoring NO_COLOR.
 func style(w io.Writer, g *globalFlags) render.Style {
 	if g.noColor || os.Getenv("NO_COLOR") != "" {
 		return render.Style{}
 	}
-	f, ok := w.(*os.File)
-	if !ok {
-		return render.Style{}
-	}
-	info, err := f.Stat()
-	return render.Style{Color: err == nil && info.Mode()&os.ModeCharDevice != 0}
+	return render.Style{Color: isTerminal(w)}
 }
