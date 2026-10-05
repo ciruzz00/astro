@@ -1,6 +1,8 @@
 name: astro
 
 services:
+  # Build, test and lint. Never loads .env, so real API keys cannot reach
+  # tests or tool output.
   dev:
     build:
       context: .
@@ -10,14 +12,18 @@ services:
         GID: "${HOST_GID:-1000}"
     image: astro-dev:local
     working_dir: /src
-    env_file:
-      - path: .env
-        required: false
     volumes:
       - .:/src
       - gomod:/home/dev/go/pkg/mod
       - gobuild:/home/dev/.cache/go-build
       - data:/data
+
+  # Interactive use of astro (make try / make run), with the keys from .env.
+  cli:
+    extends: dev
+    env_file:
+      - path: .env
+        required: false
 
 volumes:
   gomod:

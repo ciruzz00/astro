@@ -5,6 +5,8 @@ export HOST_GID := $(shell id -g)
 
 COMPOSE := docker compose
 RUN     := $(COMPOSE) run --rm dev
+# Only the cli service loads the API keys from .env.
+CLI     := $(COMPOSE) run --rm cli
 VERSION ?= dev
 DATE    ?= $(shell date -u +%Y-%m-%d)
 
@@ -46,10 +48,10 @@ build: ## Build a linux binary for the container into dist/
 	$(RUN) go build -trimpath -o dist/astro ./cmd/astro
 
 run: ## Run astro in the container, e.g. make run ARGS="search T1059"
-	$(RUN) go run ./cmd/astro $(ARGS)
+	$(CLI) go run ./cmd/astro $(ARGS)
 
 try: ## Open a shell with astro built and on PATH, to try it out
-	$(RUN) sh -c 'go build -trimpath -o /home/dev/bin/astro ./cmd/astro && \
+	$(CLI) sh -c 'go build -trimpath -o /home/dev/bin/astro ./cmd/astro && \
 		printf "\nastro is ready. Try:\n  astro sync --list\n  astro search CVE-2021-44228 T1059.001\n  astro --help\nType exit to leave.\n\n" && \
 		PATH=/home/dev/bin:$$PATH exec bash'
 
