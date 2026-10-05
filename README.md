@@ -7,8 +7,8 @@ detected automatically and looked up across many intelligence feeds at once.
 Built for incident response, threat hunting and CTF/DFIR challenges
 (Hack The Box Sherlocks, TryHackMe).
 
-> **Status:** early development. The CLI, the REST API and all the sources below
-> work; web UI, TUI, cases and PDF reports are on the roadmap.
+> **Status:** early development. The CLI, the REST API, cases and all the sources
+> below work; web UI, TUI and PDF reports are on the roadmap.
 
 ## Features
 
@@ -20,6 +20,9 @@ Built for incident response, threat hunting and CTF/DFIR challenges
 - **Offline datasets:** MITRE ATT&CK (enterprise, mobile, ICS), CISA KEV and
   the IEEE MAC registry, searchable without network access.
 - **Parallel lookups** with per-source timeouts, rate limits and a local cache.
+- **Cases** to collect indicators, results, notes and tags under a TLP marking,
+  resume them later and export them as Markdown, JSON, STIX 2.1 or an ATT&CK
+  Navigator layer.
 - **JSON output** for scripting.
 
 ## Sources
@@ -76,6 +79,24 @@ astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f
 astro providers                              # enabled sources and missing keys
 ```
 
+## Cases
+
+```sh
+astro case new brutus --title "HTB Sherlock: Brutus" --tlp green --tag htb
+astro case add brutus -f auth.log --search          # extract, add and search IOCs
+astro search --case brutus "Lazarus Group"          # save any search into a case
+astro case note brutus "Initial access via SSH brute force"
+astro case show brutus
+astro case export brutus --format md -o brutus      # md, json, stix, navigator
+astro case list --all
+```
+
+Cases keep the latest result of each indicator, so they can be resumed and
+re-searched later (`astro case search brutus --all`). Exports are marked with the
+case TLP; Markdown reports defang indicators and escape provider data, STIX
+bundles use the OASIS TLP 2.0 markings, and Navigator layers highlight the case
+techniques plus those referenced by threat intel on its indicators.
+
 ## REST API
 
 ```sh
@@ -92,6 +113,10 @@ astro serve                      # http://127.0.0.1:8080, localhost only
 | `POST /api/v1/search` | search up to 100 indicators |
 | `POST /api/v1/extract` | extract indicators from text |
 | `POST /api/v1/enrich` | extract from an alert or text, search, and return an overall verdict |
+| `GET /api/v1/cases` · `POST /api/v1/cases` | list or create cases |
+| `GET /api/v1/cases/{name}` | a case with indicators, results and notes |
+| `POST /api/v1/cases/{name}/indicators` | add indicators or free text, optionally searching them |
+| `GET /api/v1/cases/{name}/export?format=` | export as `json`, `md`, `stix` or `navigator` |
 
 ```sh
 curl -H "Authorization: Bearer $ASTRO_TOKEN" "http://127.0.0.1:8080/api/v1/search?q=8.8.8.8"
