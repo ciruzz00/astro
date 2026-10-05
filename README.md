@@ -75,9 +75,36 @@ nvd = "..."
 
 Environment variables override the file: see [`.env.example`](.env.example).
 
+### API keys
+
+Every key is free and optional: sources without a key are skipped.
+
+| Source | Where to get it | Free tier |
+|---|---|---|
+| VirusTotal | sign up at [virustotal.com](https://www.virustotal.com/gui/join-us), then [API key](https://www.virustotal.com/gui/my-apikey) | 4 requests/min, 500/day, non-commercial use |
+| abuse.ch (MalwareBazaar, ThreatFox, URLhaus) | log in at [auth.abuse.ch](https://auth.abuse.ch/) and create an Auth-Key | one key for all abuse.ch services, fair use |
+| AbuseIPDB | sign up at [abuseipdb.com](https://www.abuseipdb.com/register), then [API](https://www.abuseipdb.com/account/api) | 1,000 IP checks/day |
+| AlienVault OTX | sign up at [otx.alienvault.com](https://otx.alienvault.com/), key under *Settings* | generous rate limit |
+| Shodan | sign up at [account.shodan.io](https://account.shodan.io/register), key on the account page | limited query credits; [InternetDB](https://internetdb.shodan.io/) needs no key |
+| GreyNoise | sign up at [viz.greynoise.io](https://viz.greynoise.io/signup), key under *Account → API Key* | Community API, limited lookups |
+| NVD | request at [nvd.nist.gov](https://nvd.nist.gov/developers/request-an-api-key) (activated by email) | raises the limit from 5 to 50 requests per 30s |
+
+Limits change over time: check each provider's terms.
+
 ## Development
 
 Everything runs in Docker: no Go toolchain is needed on the host.
+
+To try astro without installing anything, open a shell in the dev container
+with `astro` built and on the `PATH` (keys from `.env` are loaded, datasets
+persist in the `astro-data` volume):
+
+```sh
+make try
+astro sync
+astro search CVE-2021-44228 T1059.001 "Lazarus Group"
+exit
+```
 
 ```sh
 make help     # list targets
