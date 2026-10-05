@@ -181,11 +181,7 @@ func (s *server) exportCase(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ct := "application/json"
-	if report.Extension(format) == ".md" {
-		ct = "text/markdown; charset=utf-8"
-	}
-	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Type", report.ContentType(format))
 	// name is validated (letters, digits, . _ -): safe in the header.
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+report.Extension(format)+`"`)
 	_, _ = w.Write(buf.Bytes())

@@ -54,9 +54,10 @@ type Verifier interface {
 
 // Config holds the dependencies of the API.
 type Config struct {
-	Engine        *engine.Engine
-	Cases         *cases.Service
-	Sources       []Source
+	Engine *engine.Engine
+	Cases  *cases.Service
+	// Sources returns the current sources; it changes when API keys do.
+	Sources       func() []Source
 	Tokens        Verifier
 	Version       string
 	AttackVersion string
@@ -113,7 +114,7 @@ func (s *server) openapi(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *server) providers(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.Sources)
+	writeJSON(w, http.StatusOK, s.Sources())
 }
 
 // SearchOptions are the options shared by search and enrich requests.
@@ -263,7 +264,7 @@ func (s *server) enrich(w http.ResponseWriter, r *http.Request) {
 
 // engineOptions validates source selection against the configured sources.
 func (s *server) engineOptions(o SearchOptions) (engine.SearchOptions, error) {
-	return ResolveOptions(s.Sources, o)
+	return ResolveOptions(s.Sources(), o)
 }
 
 // ResolveOptions turns user search options into engine options, checking

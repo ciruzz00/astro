@@ -608,8 +608,9 @@
             "schema": {
               "type": "string",
               "enum": [
-                "json",
+                "pdf",
                 "md",
+                "json",
                 "stix",
                 "navigator"
               ],
@@ -619,10 +620,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Exported case (Markdown, JSON, STIX 2.1 bundle or ATT&CK Navigator layer)",
+            "description": "Exported case (PDF report, Markdown, JSON, STIX 2.1 bundle or ATT&CK Navigator layer)",
             "content": {
               "application/json": {},
-              "text/markdown": {}
+              "text/markdown": {},
+              "application/pdf": {}
             }
           },
           "404": {

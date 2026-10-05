@@ -59,10 +59,12 @@ func newTestServer(t *testing.T) *httptest.Server {
 	h := NewHandler(Config{
 		Engine: eng,
 		Cases:  cases.New(st, eng),
-		Sources: []Source{
-			{Name: "online", Enabled: true},
-			{Name: "local", Enabled: true, Offline: true},
-			{Name: "paid", Enabled: false, KeyEnv: "ASTRO_PAID_KEY"},
+		Sources: func() []Source {
+			return []Source{
+				{Name: "online", Enabled: true},
+				{Name: "local", Enabled: true, Offline: true},
+				{Name: "paid", Enabled: false, KeyEnv: "ASTRO_PAID_KEY"},
+			}
 		},
 		Tokens:  fakeVerifier{},
 		Version: "test",
