@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -35,11 +35,13 @@ var staticFS embed.FS
 
 // Config holds the dependencies of the web interface.
 type Config struct {
-	Engine  *engine.Engine
-	Cases   *cases.Service
-	Store   *store.Store
-	Tokens  *auth.Manager
-	Sources []api.Source
+	Engine *engine.Engine
+	Cases  *cases.Service
+	Store  *store.Store
+	Tokens *auth.Manager
+	// Sources returns the current sources; it changes when API keys do.
+	Sources func() []api.Source
+	Keys    KeyManager
 	Fetcher datasets.Fetcher
 	Version string
 	// Secure marks the session cookie Secure (set when serving over TLS).
@@ -49,14 +51,15 @@ type Config struct {
 
 type server struct {
 	Config
-	pages    map[string]*template.Template
+	// pages holds the parsed templates per language and page name.
+	pages    map[string]map[string]*template.Template
 	sessions *sessions
 	login    *rate.Limiter
 	now      func() time.Time
 }
 
 // pageFiles maps page names to their template files; each is parsed with the layout.
-var pageFiles = []string{"login", "home", "results", "extract", "cases", "case", "sources", "tokens", "error"}
+var pageFiles = []string{"login", "home", "results", "extract", "cases", "case", "sources", "settings", "tokens", "guide", "error"}
 
 // NewHandler returns the web interface handler.
 func NewHandler(cfg Config) (http.Handler, error) {
@@ -65,7 +68,7 @@ func NewHandler(cfg Config) (http.Handler, error) {
 	}
 	s := &server{
 		Config:   cfg,
-		pages:    map[string]*template.Template{},
+		pages:    map[string]map[string]*template.Template{},
 		sessions: newSessions(),
 		login:    rate.NewLimiter(rate.Every(2*time.Second), 5),
 		now:      time.Now,
@@ -74,14 +77,20 @@ func NewHandler(cfg Config) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	fm := template.FuncMap{"asset": func(name string) string { return assets[name] }}
-	for _, p := range pageFiles {
-		t, err := template.New("layout.html").Funcs(funcs).Funcs(fm).ParseFS(templateFS,
-			"templates/layout.html", "templates/components.html", "templates/"+p+".html")
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", p, err)
+	for _, lang := range languages {
+		s.pages[lang] = map[string]*template.Template{}
+		fm := template.FuncMap{
+			"asset": func(name string) string { return assets[name] },
+			"t":     func(key string, args ...any) string { return translate(lang, key, args...) },
 		}
-		s.pages[p] = t
+		for _, p := range pageFiles {
+			t, err := template.New("layout.html").Funcs(funcs).Funcs(fm).ParseFS(templateFS,
+				"templates/layout.html", "templates/components.html", "templates/"+p+".html")
+			if err != nil {
+				return nil, fmt.Errorf("parse %s: %w", p, err)
+			}
+			s.pages[lang][p] = t
+		}
 	}
 
 	static, err := fs.Sub(staticFS, "static")
@@ -93,6 +102,7 @@ func NewHandler(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /login", s.loginPage)
 	mux.HandleFunc("POST /login", s.loginSubmit)
 	mux.HandleFunc("POST /logout", s.logout)
+	mux.HandleFunc("GET /lang", s.setLanguage)
 
 	authed := http.NewServeMux()
 	authed.HandleFunc("GET /{$}", s.home)
@@ -115,6 +125,11 @@ func NewHandler(cfg Config) (http.Handler, error) {
 	authed.HandleFunc("GET /cases/{name}/export", s.caseExport)
 	authed.HandleFunc("GET /sources", s.sourcesPage)
 	authed.HandleFunc("POST /sources/sync", s.syncDatasets)
+	authed.HandleFunc("GET /settings", s.settingsPage)
+	authed.HandleFunc("POST /settings/keys", s.saveKey)
+	authed.HandleFunc("POST /settings/keys/delete", s.deleteKey)
+	authed.HandleFunc("POST /settings/keys/test", s.testKey)
+	authed.HandleFunc("GET /guide", s.guidePage)
 	authed.HandleFunc("GET /tokens", s.tokensPage)
 	authed.HandleFunc("POST /tokens", s.createToken)
 	authed.HandleFunc("POST /tokens/revoke", s.revokeToken)
@@ -195,19 +210,23 @@ type pageData struct {
 	Flash   *flash
 	Version string
 	User    string
+	Lang    string
+	Path    string
 	Data    any
 }
 
 // render executes a page with the layout. Pages are rendered into a buffer
 // first so a template error never sends a half-written page.
 func (s *server) render(w http.ResponseWriter, r *http.Request, status int, page, title, nav string, data any) {
-	t, ok := s.pages[page]
+	lang := langOf(r)
+	t, ok := s.pages[lang][page]
 	if !ok {
 		s.fail(w, r, fmt.Errorf("unknown page %q", page))
 		return
 	}
 	in := info(r)
-	pd := pageData{Title: title, Nav: nav, Version: s.Version, User: in.tokenName, Data: data}
+	pd := pageData{Title: translate(lang, title), Nav: nav, Version: s.Version, User: in.tokenName,
+		Lang: lang, Path: r.URL.RequestURI(), Data: data}
 	if in.sessionID != "" {
 		pd.Flash = s.sessions.takeFlash(in.sessionID)
 	}
@@ -223,9 +242,10 @@ func (s *server) render(w http.ResponseWriter, r *http.Request, status int, page
 }
 
 // flashRedirect stores a message for the next page and redirects (PRG).
+// The message is translated to the user's language.
 func (s *server) flashRedirect(w http.ResponseWriter, r *http.Request, to, kind, msg string) {
 	if id := info(r).sessionID; id != "" {
-		s.sessions.setFlash(id, flash{Kind: kind, Message: msg})
+		s.sessions.setFlash(id, flash{Kind: kind, Message: translate(langOf(r), msg)})
 	}
 	redirect(w, r, to)
 }
@@ -254,7 +274,7 @@ func isLocalPath(p string) bool {
 // fail renders a generic error page and logs the cause.
 func (s *server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	s.Logger.Error("web request failed", "path", r.URL.Path, "err", err)
-	s.render(w, r, http.StatusInternalServerError, "error", "Error", "", "Something went wrong. Details are in the server log.")
+	s.render(w, r, http.StatusInternalServerError, "error", "Error", "", translate(langOf(r), "Something went wrong. Details are in the server log."))
 }
 
 // --- middleware ---

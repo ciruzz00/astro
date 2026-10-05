@@ -1,7 +1,8 @@
 {{define "content"}}
 <section class="card error-page">
+  {{template "icon" "alert"}}
   <h1>{{.Title}}</h1>
   <p>{{.Data}}</p>
-  <p><a class="btn" href="/">Back to search</a></p>
+  <p><a class="btn" href="/">{{t "Back to search"}}</a></p>
 </section>
 {{end}}

@@ -1,43 +1,45 @@
 {{define "content"}}
 {{with .Data}}
-<section class="page-head"><h1>API tokens</h1></section>
-<p class="muted">Tokens authenticate the REST API (<code>Authorization: Bearer …</code>) and sign in to this interface. Only a hash is stored: a token is shown once, when created. Revoking a token also signs out its web sessions.</p>
+<header class="page-head">
+  <div><h1>{{t "Access tokens"}}</h1>
+  <p class="lead">{{t "Tokens sign in to this interface and authenticate the REST API (Authorization: Bearer). Only a hash is stored: a token is shown once, when created. Revoking a token also signs out its sessions."}}</p></div>
+</header>
 
 {{if .NewSecret}}
 <section class="card secret" role="alert">
-  <h2>Token "{{.NewName}}" created</h2>
-  <p>Copy it now and store it in a password manager: it will not be shown again.</p>
-  <div class="row"><code class="secret-value">{{.NewSecret}}</code>
-    <button type="button" class="btn btn-sm" data-copy="{{.NewSecret}}">Copy</button></div>
+  <h2>{{t "Token \"%s\" created" .NewName}}</h2>
+  <p>{{t "Copy it now and store it in a password manager: it will not be shown again."}}</p>
+  <div class="row wrap"><code class="secret-value">{{.NewSecret}}</code>
+    <button type="button" class="btn btn-sm" data-copy="{{.NewSecret}}">{{t "Copy"}}</button></div>
 </section>
 {{end}}
 
 <section class="card">
-  <header class="card-head"><h2>Create a token</h2></header>
-  <form method="post" action="/tokens" class="row">
-    <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="name, e.g. sentinelone" aria-label="Token name">
-    <button class="btn btn-primary" type="submit">Create</button>
+  <header class="card-head"><h2>{{t "Create a token"}}</h2></header>
+  <form method="post" action="/tokens" class="row wrap">
+    <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="{{t "name, e.g. sentinelone"}}" aria-label="{{t "Token name"}}">
+    <button class="btn btn-primary" type="submit">{{template "icon" "plus"}}{{t "Create"}}</button>
   </form>
 </section>
 
 <section class="card">
-  <table class="table">
-    <thead><tr><th>Name</th><th>Prefix</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{t "Name"}}</th><th>{{t "Prefix"}}</th><th>{{t "Created"}}</th><th>{{t "Last used"}}</th><th>{{t "Status"}}</th><th></th></tr></thead>
     <tbody>
     {{range .Tokens}}
       <tr>
-        <td><strong>{{.Name}}</strong>{{if eq .Name $.Data.Current}} <span class="muted small">(this session)</span>{{end}}</td>
+        <td><strong>{{.Name}}</strong>{{if eq .Name $.Data.Current}} <span class="muted small">({{t "this session"}})</span>{{end}}</td>
         <td><code>{{.Prefix}}…</code></td>
-        <td class="small">{{date .CreatedAt}}</td>
-        <td class="small">{{with .LastUsedAt}}{{date .}}{{else}}never{{end}}</td>
-        <td>{{if .RevokedAt}}<span class="badge v-none">revoked {{date .RevokedAt}}</span>{{else}}<span class="badge v-clean">active</span>{{end}}</td>
+        <td class="small nowrap">{{date .CreatedAt}}</td>
+        <td class="small nowrap">{{with .LastUsedAt}}{{date .}}{{else}}{{t "never"}}{{end}}</td>
+        <td>{{if .RevokedAt}}<span class="badge v-none">{{t "revoked"}} {{date .RevokedAt}}</span>{{else}}<span class="badge v-clean">{{t "active"}}</span>{{end}}</td>
         <td class="row-actions">{{if not .RevokedAt}}
           <form method="post" action="/tokens/revoke"><input type="hidden" name="name" value="{{.Name}}">
-            <button class="btn btn-ghost btn-xs danger" type="submit">Revoke</button></form>{{end}}</td>
+            <button class="btn btn-ghost btn-xs danger" type="submit">{{t "Revoke"}}</button></form>{{end}}</td>
       </tr>
-    {{else}}<tr><td colspan="6" class="muted">No tokens.</td></tr>{{end}}
+    {{else}}<tr><td colspan="6" class="muted">{{t "No tokens."}}</td></tr>{{end}}
     </tbody>
-  </table>
+  </table></div>
 </section>
 {{end}}
 {{end}}

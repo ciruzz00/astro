@@ -1,0 +1,64 @@
+{{define "content"}}
+{{with .Data}}
+<header class="page-head">
+  <div><h1>{{t "API keys"}}</h1>
+  <p class="lead">{{t "Keys of the intelligence platforms. Sources that need a key are enabled as soon as it is saved, without restarting."}}</p></div>
+  <span class="pill pill-online">{{t "%d of %d sources enabled" .Enabled .Total}}</span>
+</header>
+
+<div class="callout">{{template "icon" "lock"}}<div>
+  <p>{{t "Keys are stored in astro's database, which only its owner can read. They are never shown again, logged or returned by the API."}}</p>
+  <p class="muted small">{{t "Precedence: environment variables, then keys saved here, then config.toml. Keys set in the environment are locked here."}}</p>
+</div></div>
+
+{{if .Tests}}
+<section class="card test-results" role="status">
+  <header class="card-head"><h2>{{t "Test of %s" .Tested}}</h2></header>
+  <ul class="checks">
+    {{range .Tests}}<li class="{{if .OK}}ok{{else}}fail{{end}}">{{if .OK}}{{template "icon" "check"}}{{else}}{{template "icon" "x"}}{{end}}<strong>{{.Provider}}</strong> <span>{{clean .Message}}</span></li>{{end}}
+  </ul>
+</section>
+{{end}}
+
+<div class="key-grid">
+{{range .Keys}}
+  <section class="card key-card" id="key-{{.Name}}">
+    <header class="key-head">
+      <div>
+        <h2>{{.Label}}</h2>
+        <p class="muted small">{{t "Used by"}}: {{join .Providers ", "}}</p>
+      </div>
+      {{if eq .Origin "env"}}<span class="badge v-info">{{t "environment"}}</span>
+      {{else if eq .Origin "database"}}<span class="badge v-clean">{{t "configured"}}</span>
+      {{else if eq .Origin "file"}}<span class="badge v-info">config.toml</span>
+      {{else}}<span class="badge v-none">{{t "not set"}}</span>{{end}}
+    </header>
+
+    {{if eq .Origin "env"}}
+      <p class="muted small">{{template "icon" "lock"}} {{t "Set by the environment variable"}} <code>{{.Env}}</code>. {{t "Change it there and restart astro."}}</p>
+    {{else}}
+      <form method="post" action="/settings/keys" class="key-form">
+        <input type="hidden" name="name" value="{{.Name}}">
+        <input type="password" name="value" required minlength="8" maxlength="512" autocomplete="off" spellcheck="false"
+               aria-label="{{t "API key for"}} {{.Label}}" placeholder="{{if .Origin}}{{t "Enter a new key to replace it"}}{{else}}{{t "Paste the API key"}}{{end}}">
+        <button class="btn btn-primary btn-sm" type="submit">{{t "Save"}}</button>
+      </form>
+      {{with .UpdatedAt}}<p class="muted small">{{t "Saved"}} {{date .}}</p>{{end}}
+    {{end}}
+
+    <div class="key-actions">
+      <a class="small" href="{{.URL}}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{t "Get a key"}} ↗</a>
+      {{if .Origin}}
+        <form method="post" action="/settings/keys/test"><input type="hidden" name="name" value="{{.Name}}">
+          <button class="btn btn-sm" type="submit">{{template "icon" "check"}}{{t "Test"}}</button></form>
+      {{end}}
+      {{if eq .Origin "database"}}
+        <form method="post" action="/settings/keys/delete"><input type="hidden" name="name" value="{{.Name}}">
+          <button class="btn btn-ghost btn-sm danger" type="submit">{{t "Remove"}}</button></form>
+      {{end}}
+    </div>
+  </section>
+{{end}}
+</div>
+{{end}}
+{{end}}

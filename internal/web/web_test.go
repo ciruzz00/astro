@@ -2,13 +2,17 @@ package web
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,6 +40,31 @@ func (fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Result
 		Reference: "javascript:alert(1)", Fields: []provider.Field{{Name: "Owner", Value: "<b>evil</b>"}}}, nil
 }
 
+// fakeKeys is an in-memory KeyManager.
+type fakeKeys struct{ value string }
+
+func (f *fakeKeys) KeyStatuses(context.Context) ([]KeyStatus, error) {
+	k := KeyStatus{Name: "virustotal", Label: "VirusTotal", Env: "ASTRO_VIRUSTOTAL_KEY", URL: "https://example.com/key", Providers: []string{"virustotal"}}
+	if f.value != "" {
+		k.Origin = "database"
+	}
+	return []KeyStatus{k, {Name: "nvd", Label: "NVD", Env: "ASTRO_NVD_KEY", Origin: "env", Providers: []string{"nvd"}}}, nil
+}
+
+func (f *fakeKeys) SetKey(_ context.Context, name, value string) error {
+	if name == "nvd" {
+		return errors.New("this key is set by an environment variable, which takes precedence: change or remove it there (e.g. in .env) and restart")
+	}
+	f.value = value
+	return nil
+}
+
+func (f *fakeKeys) DeleteKey(context.Context, string) error { f.value = ""; return nil }
+
+func (f *fakeKeys) TestKey(context.Context, string) ([]KeyTest, error) {
+	return []KeyTest{{Provider: "virustotal", OK: true, Message: "OK (44d886…)"}}, nil
+}
+
 type env struct {
 	srv    *httptest.Server
 	client *http.Client
@@ -58,7 +87,10 @@ func setup(t *testing.T) *env {
 	}
 	h, err := NewHandler(Config{
 		Engine: eng, Cases: cases.New(st, eng), Store: st, Tokens: tokens,
-		Sources: []api.Source{{Name: "fake", Enabled: true, Indicators: []string{"hash"}}, {Name: "paid", KeyEnv: "ASTRO_PAID_KEY"}},
+		Sources: func() []api.Source {
+			return []api.Source{{Name: "fake", Enabled: true, Indicators: []string{"hash"}}, {Name: "paid", KeyEnv: "ASTRO_PAID_KEY"}}
+		},
+		Keys:    &fakeKeys{},
 		Fetcher: func(context.Context, string, int64) ([]byte, error) { return nil, io.ErrUnexpectedEOF },
 		Version: "test", Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -300,16 +332,116 @@ func TestHTMXRedirect(t *testing.T) {
 
 func TestIsLocalPath(t *testing.T) {
 	for p, want := range map[string]bool{
-		"/":                true,
-		"/cases/x#notes":   true,
-		"//evil.com":       false,
-		"/\\evil.com":      false,
-		"https://evil.com": false,
-		"cases":            false,
+		"/":                     true,
+		"/cases/x#notes":        true,
+		"//evil.com":            false,
+		"/\\evil.com":           false,
+		"https://evil.com":      false,
+		"cases":                 false,
 		"/x\r\nSet-Cookie: a=b": false,
 	} {
 		if got := isLocalPath(p); got != want {
 			t.Errorf("isLocalPath(%q) = %v, want %v", p, got, want)
+		}
+	}
+}
+
+func TestAPIKeysNeverShown(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	secretKey := "vt-super-secret-key-123456"
+	_, body := e.do(t, "POST", "/settings/keys", url.Values{"name": {"virustotal"}, "value": {secretKey}})
+	if !strings.Contains(body, "Key saved") || strings.Contains(body, secretKey) {
+		t.Fatalf("save key: flash missing or key echoed")
+	}
+	_, body = e.do(t, "GET", "/settings", nil)
+	if strings.Contains(body, secretKey) || !strings.Contains(body, "configured") || !strings.Contains(body, "ASTRO_NVD_KEY") {
+		t.Error("settings page must show status, never the key")
+	}
+	if _, body := e.do(t, "POST", "/settings/keys", url.Values{"name": {"nvd"}, "value": {"whatever-123"}}); !strings.Contains(body, "environment variable") {
+		t.Error("env-locked key must be refused")
+	}
+	if _, body := e.do(t, "POST", "/settings/keys/test", url.Values{"name": {"virustotal"}}); !strings.Contains(body, "Test of virustotal") {
+		t.Error("test results missing")
+	}
+	if _, body := e.do(t, "POST", "/settings/keys/delete", url.Values{"name": {"virustotal"}}); !strings.Contains(body, "Key removed.") {
+		t.Error("delete key failed")
+	}
+}
+
+func TestLanguageSwitch(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	_, body := e.do(t, "GET", "/lang?l=it&next=/cases", nil)
+	if !strings.Contains(body, `lang="it"`) || !strings.Contains(body, "Nuovo caso") || !strings.Contains(body, "Indaga") {
+		t.Fatal("Italian interface not shown after switching")
+	}
+	_, body = e.do(t, "GET", "/guide", nil)
+	if !strings.Contains(body, "Equivalenti da riga di comando") || !strings.Contains(body, "Report PDF") {
+		t.Error("Italian guide missing")
+	}
+	// The flash message of an action is translated too.
+	_, body = e.do(t, "POST", "/cases", url.Values{"name": {"caso-1"}})
+	if !strings.Contains(body, "Caso creato.") {
+		t.Error("flash not translated")
+	}
+	_, body = e.do(t, "GET", "/lang?l=en&next=//evil.example.com", nil)
+	if !strings.Contains(body, `lang="en"`) || !strings.Contains(body, "Search") {
+		t.Error("switch back to English failed (or followed an external redirect)")
+	}
+	_, body = e.do(t, "GET", "/guide", nil)
+	if !strings.Contains(body, "Command-line equivalents") {
+		t.Error("English guide missing")
+	}
+}
+
+func TestLanguageFromBrowser(t *testing.T) {
+	e := setup(t)
+	req, _ := http.NewRequest("GET", e.srv.URL+"/login", nil)
+	req.Header.Set("Accept-Language", "it-IT,it;q=0.9,en;q=0.8")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(b), "Accedi") {
+		t.Error("login page must follow Accept-Language")
+	}
+}
+
+func TestPDFExportFromWeb(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	e.do(t, "POST", "/cases", url.Values{"name": {"pdf-case"}})
+	e.do(t, "POST", "/cases/pdf-case/indicators", url.Values{"text": {"198.51.100.7"}, "search": {"on"}})
+	resp, body := e.do(t, "GET", "/cases/pdf-case/export?format=pdf", nil)
+	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "application/pdf" || !strings.HasPrefix(body, "%PDF-") {
+		t.Errorf("pdf export: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+}
+
+// TestItalianCatalogIsComplete fails when a template string has no Italian
+// translation or a translation changes the formatting verbs.
+func TestItalianCatalogIsComplete(t *testing.T) {
+	reKey := regexp.MustCompile(`[{(]\s*t\s+"((?:[^"\\]|\\.)*)"`)
+	files, _ := templateFS.ReadDir("templates")
+	for _, f := range files {
+		b, err := os.ReadFile("templates/" + f.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range reKey.FindAllStringSubmatch(string(b), -1) {
+			key := strings.ReplaceAll(m[1], `\"`, `"`)
+			if _, ok := italian[key]; !ok {
+				t.Errorf("%s: no Italian translation for %q", f.Name(), key)
+			}
+		}
+	}
+	reVerb := regexp.MustCompile(`%[sdvq]`)
+	for k, v := range italian {
+		if fmt.Sprint(reVerb.FindAllString(k, -1)) != fmt.Sprint(reVerb.FindAllString(v, -1)) {
+			t.Errorf("verbs differ: %q -> %q", k, v)
 		}
 	}
 }

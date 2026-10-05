@@ -3,7 +3,6 @@ package web
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,7 +17,7 @@ var tlpLevels = []string{cases.TLPClear, cases.TLPGreen, cases.TLPAmber, cases.T
 
 func caseMessage(name string, err error) string {
 	if errors.Is(err, cases.ErrNotFound) {
-		return fmt.Sprintf("No case named %q.", name)
+		return "No such case."
 	}
 	return err.Error()
 }
@@ -100,7 +99,7 @@ func (s *server) casePage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	d := caseData{View: v, Sources: s.Sources, TLPs: tlpLevels, Formats: report.Formats}
+	d := caseData{View: v, Sources: s.Sources(), TLPs: tlpLevels, Formats: report.Formats}
 	d.Malicious, d.Suspicious, d.Clean, d.Pending = v.Counts()
 	title := v.Case.Title
 	if title == "" {
@@ -117,7 +116,7 @@ func (s *server) caseAction(w http.ResponseWriter, r *http.Request, anchor strin
 		return
 	}
 	if err := parseForm(w, r); err != nil {
-		s.flashRedirect(w, r, caseURL(name), "error", "Invalid form: "+err.Error())
+		s.flashRedirect(w, r, caseURL(name), "error", s.tr(r, "Invalid form: %s", err.Error()))
 		return
 	}
 	msg, err := fn(name)
@@ -138,7 +137,7 @@ func (s *server) caseAddIndicators(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return "", err
 		}
-		msg := fmt.Sprintf("%d new indicators added (%d given).", added, len(inds))
+		msg := s.tr(r, "%d new indicators added (%d given).", added, len(inds))
 		if r.FormValue("search") == "on" {
 			eo, _, err := s.formOptions(r)
 			if err != nil {
@@ -148,7 +147,7 @@ func (s *server) caseAddIndicators(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return "", err
 			}
-			msg += fmt.Sprintf(" %d searched.", len(reps))
+			msg += " " + s.tr(r, "%d searched.", len(reps))
 		}
 		return msg, nil
 	})
@@ -167,7 +166,7 @@ func (s *server) caseSearch(w http.ResponseWriter, r *http.Request) {
 		if len(reps) == 0 {
 			return "Nothing new to search: use \"Search all again\" to refresh every result.", nil
 		}
-		return fmt.Sprintf("%d indicators searched.", len(reps)), nil
+		return s.tr(r, "%d indicators searched.", len(reps)), nil
 	})
 }
 
@@ -199,7 +198,7 @@ func (s *server) caseRemoveItem(w http.ResponseWriter, r *http.Request) {
 		if err := s.Cases.Remove(r.Context(), name, i); err != nil {
 			return "", err
 		}
-		return ioc.Defang(i) + " removed.", nil
+		return s.tr(r, "%s removed.", ioc.Defang(i)), nil
 	})
 }
 
@@ -215,7 +214,11 @@ func (s *server) caseEdit(w http.ResponseWriter, r *http.Request) {
 func (s *server) caseStatus(w http.ResponseWriter, r *http.Request) {
 	s.caseAction(w, r, "", func(name string) (string, error) {
 		status := r.FormValue("status")
-		return "Case " + status + ".", s.Cases.Update(r.Context(), name, nil, nil, nil, &status)
+		msg := "Case reopened."
+		if status == "closed" {
+			msg = "Case closed."
+		}
+		return msg, s.Cases.Update(r.Context(), name, nil, nil, nil, &status)
 	})
 }
 
@@ -232,7 +235,7 @@ func (s *server) caseDelete(w http.ResponseWriter, r *http.Request) {
 		s.flashRedirect(w, r, "/cases", "error", caseMessage(name, err))
 		return
 	}
-	s.flashRedirect(w, r, "/cases", "ok", "Case "+name+" deleted.")
+	s.flashRedirect(w, r, "/cases", "ok", s.tr(r, "Case %s deleted.", name))
 }
 
 func (s *server) caseExport(w http.ResponseWriter, r *http.Request) {
@@ -252,11 +255,7 @@ func (s *server) caseExport(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, http.StatusBadRequest, "error", "Export", "cases", err.Error())
 		return
 	}
-	ct := "application/json"
-	if report.Extension(format) == ".md" {
-		ct = "text/markdown; charset=utf-8"
-	}
-	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Type", report.ContentType(format))
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+report.Extension(format)+`"`)
 	_, _ = w.Write(buf.Bytes())
 }

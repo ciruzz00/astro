@@ -1,0 +1,218 @@
+{{define "content"}}
+<header class="page-head">
+  <div><h1>{{t "Guide"}}</h1><p class="lead">{{t "How every section of astro works, and what each export format is for."}}</p></div>
+</header>
+<div class="guide">
+{{if eq .Lang "it"}}{{template "guide-it" .}}{{else}}{{template "guide-en" .}}{{end}}
+</div>
+{{end}}
+
+{{define "guide-it"}}
+<nav class="toc card" aria-label="Indice">
+  <p class="toc-title">Indice</p>
+  <ol>
+    <li><a href="#overview">Panoramica</a></li>
+    <li><a href="#search">Ricerca</a></li>
+    <li><a href="#verdicts">Verdetti</a></li>
+    <li><a href="#extract">Estrazione</a></li>
+    <li><a href="#cases">Casi</a></li>
+    <li><a href="#tlp">TLP</a></li>
+    <li><a href="#export">Export</a></li>
+    <li><a href="#sources">Fonti e dataset</a></li>
+    <li><a href="#keys">Chiavi API</a></li>
+    <li><a href="#tokens">Token di accesso e REST API</a></li>
+    <li><a href="#opsec">Sicurezza e OPSEC</a></li>
+    <li><a href="#cli">Equivalenti da riga di comando</a></li>
+  </ol>
+</nav>
+<article class="card prose">
+<h2 id="overview">Panoramica</h2>
+<p>astro cerca un indicatore su tutte le fonti di threat intelligence configurate e ne riassume il risultato. Il flusso tipico è: <strong>Ricerca</strong> o <strong>Estrazione</strong> degli indicatori → raccolta in un <strong>Caso</strong> → note e analisi → <strong>Export</strong> del report.</p>
+<p>Tutto gira sul server dove è installato astro: la ricerca contatta solo le fonti online abilitate, i dataset offline (MITRE ATT&amp;CK, CISA KEV, registro MAC IEEE) restano in locale.</p>
+
+<h2 id="search">Ricerca</h2>
+<p>Nella pagina <strong>Ricerca</strong> scrivi uno o più indicatori. Il tipo viene riconosciuto in automatico: hash MD5/SHA1/SHA256/SHA512, IPv4/IPv6, domini, URL, email, CVE, ID ATT&amp;CK (es. <code>T1059.001</code>, <code>G0032</code>), indirizzi MAC e nomi liberi (es. <code>Lazarus Group</code>). Gli indicatori "defanged" come <code>hxxps://evil[.]com</code> sono accettati.</p>
+<ul>
+  <li><strong>Un indicatore per riga</strong>: ogni riga deve essere un indicatore valido.</li>
+  <li><strong>Estrai dal testo</strong>: incolla un log, un'email o un report; astro trova da solo tutti gli indicatori.</li>
+  <li><strong>Carica un file</strong>: come "Estrai dal testo", per log e report su file (fino a 8 MB).</li>
+  <li><strong>Salva nel caso</strong>: i risultati vengono salvati direttamente in un caso aperto.</li>
+  <li><strong>Fonti e opzioni</strong>: <em>Solo offline</em> usa solo i dataset locali, <em>Ignora risultati in cache</em> forza una nuova interrogazione, <em>Solo queste fonti</em> limita la ricerca.</li>
+</ul>
+<p>Ogni risultato mostra il verdetto di ogni fonte, i dettagli (proprietario dell'IP, famiglia di malware, CVSS…) e il link alla pagina della fonte. "Copia defanged" copia l'indicatore in forma sicura da incollare in chat e report.</p>
+
+<h2 id="verdicts">Verdetti</h2>
+<table class="table"><tbody>
+<tr><td><span class="badge v-malicious">malevolo</span></td><td>La fonte lo considera dannoso (es. ≥ 5 motori su VirusTotal, campione su MalwareBazaar, C2 su ThreatFox ad alta confidenza).</td></tr>
+<tr><td><span class="badge v-suspicious">sospetto</span></td><td>Segnalazioni deboli o storiche (poche detection, pulse OTX, URL non più online).</td></tr>
+<tr><td><span class="badge v-clean">pulito</span></td><td>La fonte lo conosce e non lo ritiene dannoso.</td></tr>
+<tr><td><span class="badge v-info">info</span></td><td>Informazioni senza giudizio: ATT&amp;CK, CVE, vendor MAC, porte aperte.</td></tr>
+</tbody></table>
+<p>Il verdetto complessivo di un indicatore è il <strong>più grave</strong> tra quelli delle fonti. Le domande frequenti alle fonti sono tenute in cache (1–24 ore secondo la fonte) per rispettare le quote dei piani gratuiti.</p>
+
+<h2 id="extract">Estrazione</h2>
+<p><strong>Estrazione</strong> trova, normalizza e de-duplica gli indicatori in un testo o file <em>senza interrogare nessuna fonte</em>. Dalla tabella puoi selezionarli e cercarli, oppure aggiungerli a un caso (anche cercandoli subito).</p>
+
+<h2 id="cases">Casi</h2>
+<p>Un <strong>caso</strong> raccoglie gli indicatori di un'indagine con l'ultimo risultato di ognuno, note, tag e una marcatura TLP. Puoi riprenderlo in qualsiasi momento.</p>
+<ul>
+  <li><strong>Aggiungi indicatori</strong>: da elenco, testo o file, con nota opzionale e ricerca immediata.</li>
+  <li><strong>Cerca nuovi</strong> interroga solo gli indicatori mai cercati; <strong>Cerca di nuovo tutti</strong> aggiorna ogni risultato.</li>
+  <li><strong>Note</strong>: timeline e conclusioni in Markdown, riportate negli export.</li>
+  <li><strong>Chiudi</strong> un caso concluso (resta consultabile in "Includi chiusi"); <strong>Elimina</strong> lo cancella definitivamente, dopo aver scritto il suo nome.</li>
+</ul>
+
+<h2 id="tlp">TLP (Traffic Light Protocol 2.0)</h2>
+<table class="table"><tbody>
+<tr><td><span class="tlp tlp-red">TLP:RED</span></td><td>Solo per i presenti/destinatari, non si condivide oltre.</td></tr>
+<tr><td><span class="tlp tlp-amber-strict">TLP:AMBER+STRICT</span></td><td>Solo all'interno della propria organizzazione.</td></tr>
+<tr><td><span class="tlp tlp-amber">TLP:AMBER</span></td><td>Organizzazione e suoi clienti, secondo necessità (predefinito).</td></tr>
+<tr><td><span class="tlp tlp-green">TLP:GREEN</span></td><td>Comunità di riferimento, non pubblicamente.</td></tr>
+<tr><td><span class="tlp tlp-clear">TLP:CLEAR</span></td><td>Nessuna restrizione.</td></tr>
+</tbody></table>
+
+<h2 id="export">Export</h2>
+<p>Dal menu <strong>Export</strong> di un caso:</p>
+<table class="table"><thead><tr><th>Formato</th><th>A cosa serve</th></tr></thead><tbody>
+<tr><td><strong>Report PDF</strong></td><td>Documento da consegnare o stampare: riepilogo, tabella degli indicatori (defanged), risultati per fonte e note. L'etichetta TLP è stampata in alto e in basso su <em>ogni</em> pagina, come richiede TLP 2.0.</td></tr>
+<tr><td><strong>Markdown</strong></td><td>Report leggibile da incollare in ticket, wiki o write-up (es. Hack The Box). Indicatori defanged e dati delle fonti neutralizzati.</td></tr>
+<tr><td><strong>JSON</strong></td><td>Tutti i dati del caso, compresi i risultati completi: per script e automazioni.</td></tr>
+<tr><td><strong>STIX 2.1</strong></td><td>Bundle importabile in piattaforme di threat intelligence (MISP, OpenCTI…). Contiene indicatori con pattern, vulnerabilità, tecniche e gruppi ATT&amp;CK, marcati con il TLP ufficiale OASIS. Gli ID sono stabili: riesportare lo stesso caso non crea duplicati.</td></tr>
+<tr><td><strong>ATT&amp;CK Navigator</strong></td><td>Layer da aprire in MITRE ATT&amp;CK Navigator ("Open Existing Layer" → "Upload from local"): in rosso le tecniche del caso, in arancione quelle citate dalla threat intel sui suoi indicatori.</td></tr>
+</tbody></table>
+<p class="note-box">I file esportati contengono dati marcati TLP: condividili rispettando la marcatura del caso.</p>
+
+<h2 id="sources">Fonti e dataset</h2>
+<p><strong>Fonti</strong> elenca le fonti e il loro stato. Le fonti <em>online</em> ricevono l'indicatore cercato; quelle <em>offline</em> leggono i dataset locali. Sincronizza i dataset (MITRE ATT&amp;CK, CISA KEV, registro MAC) al primo avvio e poi periodicamente: la dashboard avvisa se hanno più di 30 giorni.</p>
+
+<h2 id="keys">Chiavi API</h2>
+<p>In <strong>Chiavi API</strong> inserisci le chiavi delle piattaforme (VirusTotal, abuse.ch, AbuseIPDB, OTX, Shodan, GreyNoise, NVD). Le fonti si attivano subito, senza riavviare. "Test" esegue una ricerca innocua (file di test EICAR, 8.8.8.8, CVE-2021-44228…) per verificare la chiave. Le chiavi non vengono più mostrate dopo il salvataggio. Se una chiave è impostata da variabile d'ambiente ha la precedenza e qui risulta bloccata.</p>
+
+<h2 id="tokens">Token di accesso e REST API</h2>
+<p>I <strong>token di accesso</strong> servono per entrare in questa interfaccia e per la REST API (<code>Authorization: Bearer …</code>). Un token si vede solo alla creazione; revocandolo si chiudono anche le sue sessioni. Crea un token per ogni integrazione (es. <code>sentinelone</code>) così da poterlo revocare separatamente.</p>
+<p>La REST API è documentata in <a href="/api/v1/openapi.json" hx-boost="false">/api/v1/openapi.json</a>. Per SOAR ed EDR (es. SentinelOne Hyperautomation) usa <code>POST /api/v1/enrich</code>: invii il testo di un alert e ricevi un verdetto complessivo con gli indicatori malevoli e sospetti.</p>
+
+<h2 id="opsec">Sicurezza e OPSEC</h2>
+<ul>
+  <li>Le fonti online (VirusTotal in particolare) possono condividere le ricerche: per indicatori sensibili o interni usa <strong>Solo offline</strong>.</li>
+  <li>Il server ascolta solo su localhost salvo configurazione esplicita; per esporlo usa TLS.</li>
+  <li>I dati delle fonti sono trattati come non fidati e mostrati in modo sicuro.</li>
+</ul>
+
+<h2 id="cli">Equivalenti da riga di comando</h2>
+<table class="table"><thead><tr><th>Web</th><th>CLI</th></tr></thead><tbody>
+<tr><td>Ricerca</td><td><code>astro search &lt;ioc…&gt; [--offline] [--only a,b] [-f file] [--case nome]</code></td></tr>
+<tr><td>Estrazione</td><td><code>astro extract [file|-] [--defang]</code></td></tr>
+<tr><td>Casi</td><td><code>astro case new|add|search|note|tag|show|export|close|delete …</code></td></tr>
+<tr><td>Export PDF</td><td><code>astro case export &lt;nome&gt; --format pdf -o report.pdf</code></td></tr>
+<tr><td>Fonti e dataset</td><td><code>astro providers</code>, <code>astro sync</code></td></tr>
+<tr><td>Chiavi API</td><td><code>astro keys list|set|unset|test</code></td></tr>
+<tr><td>Token di accesso</td><td><code>astro token create|list|revoke</code></td></tr>
+</tbody></table>
+</article>
+{{end}}
+
+{{define "guide-en"}}
+<nav class="toc card" aria-label="Contents">
+  <p class="toc-title">Contents</p>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#search">Search</a></li>
+    <li><a href="#verdicts">Verdicts</a></li>
+    <li><a href="#extract">Extract</a></li>
+    <li><a href="#cases">Cases</a></li>
+    <li><a href="#tlp">TLP</a></li>
+    <li><a href="#export">Export</a></li>
+    <li><a href="#sources">Sources and datasets</a></li>
+    <li><a href="#keys">API keys</a></li>
+    <li><a href="#tokens">Access tokens and REST API</a></li>
+    <li><a href="#opsec">Security and OPSEC</a></li>
+    <li><a href="#cli">Command-line equivalents</a></li>
+  </ol>
+</nav>
+<article class="card prose">
+<h2 id="overview">Overview</h2>
+<p>astro searches an indicator across every configured threat intelligence source and summarizes the outcome. A typical workflow is: <strong>Search</strong> or <strong>Extract</strong> indicators → collect them in a <strong>Case</strong> → add notes and analysis → <strong>Export</strong> the report.</p>
+<p>Everything runs on the server where astro is installed: searches only contact the enabled online sources, while the offline datasets (MITRE ATT&amp;CK, CISA KEV, IEEE MAC registry) stay local.</p>
+
+<h2 id="search">Search</h2>
+<p>On the <strong>Search</strong> page, enter one or more indicators. Their type is detected automatically: MD5/SHA1/SHA256/SHA512 hashes, IPv4/IPv6, domains, URLs, emails, CVEs, ATT&amp;CK IDs (e.g. <code>T1059.001</code>, <code>G0032</code>), MAC addresses and free-text names (e.g. <code>Lazarus Group</code>). Defanged input such as <code>hxxps://evil[.]com</code> is accepted.</p>
+<ul>
+  <li><strong>One per line</strong>: each line must be a valid indicator.</li>
+  <li><strong>Extract from text</strong>: paste a log, an email or a report and astro finds every indicator in it.</li>
+  <li><strong>Upload a file</strong>: like "Extract from text", for logs and reports on file (up to 8 MB).</li>
+  <li><strong>Save to case</strong>: the results go straight into an open case.</li>
+  <li><strong>Sources and options</strong>: <em>Offline only</em> uses only local datasets, <em>Ignore cached results</em> forces fresh queries, <em>Only these sources</em> narrows the search.</li>
+</ul>
+<p>Each result shows the verdict of every source, its details (IP owner, malware family, CVSS…) and a link to the source page. "Copy defanged" copies the indicator in a form that is safe to paste in chats and reports.</p>
+
+<h2 id="verdicts">Verdicts</h2>
+<table class="table"><tbody>
+<tr><td><span class="badge v-malicious">malicious</span></td><td>The source considers it harmful (e.g. ≥ 5 VirusTotal engines, a MalwareBazaar sample, a high-confidence ThreatFox C2).</td></tr>
+<tr><td><span class="badge v-suspicious">suspicious</span></td><td>Weak or historical reports (few detections, OTX pulses, URLs no longer online).</td></tr>
+<tr><td><span class="badge v-clean">clean</span></td><td>The source knows it and does not consider it harmful.</td></tr>
+<tr><td><span class="badge v-info">info</span></td><td>Information without a judgement: ATT&amp;CK, CVEs, MAC vendors, open ports.</td></tr>
+</tbody></table>
+<p>The overall verdict of an indicator is the <strong>most severe</strong> among its sources. Source answers are cached (1–24 hours depending on the source) to respect free-tier quotas.</p>
+
+<h2 id="extract">Extract</h2>
+<p><strong>Extract</strong> finds, normalizes and de-duplicates the indicators in a text or file <em>without querying any source</em>. From the table you can select them and search them, or add them to a case (optionally searching them right away).</p>
+
+<h2 id="cases">Cases</h2>
+<p>A <strong>case</strong> collects the indicators of an investigation with the latest result of each, notes, tags and a TLP marking. You can resume it at any time.</p>
+<ul>
+  <li><strong>Add indicators</strong>: from a list, text or file, with an optional note and an immediate search.</li>
+  <li><strong>Search new</strong> queries only the indicators never searched; <strong>Search all again</strong> refreshes every result.</li>
+  <li><strong>Notes</strong>: timeline and findings in Markdown, carried into the exports.</li>
+  <li><strong>Close</strong> a finished case (it stays available under "Include closed"); <strong>Delete</strong> removes it permanently after you type its name.</li>
+</ul>
+
+<h2 id="tlp">TLP (Traffic Light Protocol 2.0)</h2>
+<table class="table"><tbody>
+<tr><td><span class="tlp tlp-red">TLP:RED</span></td><td>For the eyes and ears of individual recipients only, no further disclosure.</td></tr>
+<tr><td><span class="tlp tlp-amber-strict">TLP:AMBER+STRICT</span></td><td>Only within the recipient's organization.</td></tr>
+<tr><td><span class="tlp tlp-amber">TLP:AMBER</span></td><td>The organization and its clients, on a need-to-know basis (default).</td></tr>
+<tr><td><span class="tlp tlp-green">TLP:GREEN</span></td><td>Within the community, not publicly.</td></tr>
+<tr><td><span class="tlp tlp-clear">TLP:CLEAR</span></td><td>No restrictions.</td></tr>
+</tbody></table>
+
+<h2 id="export">Export</h2>
+<p>From a case's <strong>Export</strong> menu:</p>
+<table class="table"><thead><tr><th>Format</th><th>What it is for</th></tr></thead><tbody>
+<tr><td><strong>PDF report</strong></td><td>A document to hand over or print: summary, indicator table (defanged), results by source and notes. The TLP label is printed at the top and bottom of <em>every</em> page, as TLP 2.0 requires.</td></tr>
+<tr><td><strong>Markdown</strong></td><td>A readable report to paste into tickets, wikis or write-ups (e.g. Hack The Box). Indicators are defanged and source data is neutralized.</td></tr>
+<tr><td><strong>JSON</strong></td><td>All the case data, including full results: for scripts and automation.</td></tr>
+<tr><td><strong>STIX 2.1</strong></td><td>A bundle for threat intelligence platforms (MISP, OpenCTI…). It holds indicators with patterns, vulnerabilities, ATT&amp;CK techniques and groups, marked with the official OASIS TLP. IDs are stable: exporting the same case again does not create duplicates.</td></tr>
+<tr><td><strong>ATT&amp;CK Navigator</strong></td><td>A layer to open in MITRE ATT&amp;CK Navigator ("Open Existing Layer" → "Upload from local"): case techniques in red, techniques referenced by threat intel on its indicators in orange.</td></tr>
+</tbody></table>
+<p class="note-box">Exported files contain TLP-marked data: share them according to the case marking.</p>
+
+<h2 id="sources">Sources and datasets</h2>
+<p><strong>Sources</strong> lists the sources and their status. <em>Online</em> sources receive the searched indicator; <em>offline</em> ones read local datasets. Sync the datasets (MITRE ATT&amp;CK, CISA KEV, MAC registry) on first use and then regularly: the dashboard warns when they are older than 30 days.</p>
+
+<h2 id="keys">API keys</h2>
+<p>In <strong>API keys</strong> you enter the keys of the platforms (VirusTotal, abuse.ch, AbuseIPDB, OTX, Shodan, GreyNoise, NVD). Sources are enabled immediately, without a restart. "Test" runs a harmless lookup (the EICAR test file, 8.8.8.8, CVE-2021-44228…) to check the key. Keys are never shown again once saved. A key set by an environment variable takes precedence and is locked here.</p>
+
+<h2 id="tokens">Access tokens and REST API</h2>
+<p><strong>Access tokens</strong> sign in to this interface and authenticate the REST API (<code>Authorization: Bearer …</code>). A token is shown only when created; revoking it also ends its sessions. Create one token per integration (e.g. <code>sentinelone</code>) so you can revoke them separately.</p>
+<p>The REST API is described in <a href="/api/v1/openapi.json" hx-boost="false">/api/v1/openapi.json</a>. For SOAR and EDR tools (e.g. SentinelOne Hyperautomation) use <code>POST /api/v1/enrich</code>: send the text of an alert and get an overall verdict with the malicious and suspicious indicators.</p>
+
+<h2 id="opsec">Security and OPSEC</h2>
+<ul>
+  <li>Online sources (VirusTotal in particular) may share searches: use <strong>Offline only</strong> for sensitive or internal indicators.</li>
+  <li>The server listens on localhost unless configured otherwise; use TLS to expose it.</li>
+  <li>Source data is treated as untrusted and always displayed safely.</li>
+</ul>
+
+<h2 id="cli">Command-line equivalents</h2>
+<table class="table"><thead><tr><th>Web</th><th>CLI</th></tr></thead><tbody>
+<tr><td>Search</td><td><code>astro search &lt;ioc…&gt; [--offline] [--only a,b] [-f file] [--case name]</code></td></tr>
+<tr><td>Extract</td><td><code>astro extract [file|-] [--defang]</code></td></tr>
+<tr><td>Cases</td><td><code>astro case new|add|search|note|tag|show|export|close|delete …</code></td></tr>
+<tr><td>PDF export</td><td><code>astro case export &lt;name&gt; --format pdf -o report.pdf</code></td></tr>
+<tr><td>Sources and datasets</td><td><code>astro providers</code>, <code>astro sync</code></td></tr>
+<tr><td>API keys</td><td><code>astro keys list|set|unset|test</code></td></tr>
+<tr><td>Access tokens</td><td><code>astro token create|list|revoke</code></td></tr>
+</tbody></table>
+</article>
+{{end}}

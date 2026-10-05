@@ -1,18 +1,27 @@
-{{define "verdict"}}<span class="badge {{verdictClass .}}">{{verdictLabel .}}</span>{{end}}
+{{define "icon"}}<svg class="icon" aria-hidden="true" focusable="false"><use href="{{asset "icons.svg"}}#i-{{.}}"></use></svg>{{end}}
+
+{{define "lang-switch"}}
+<div class="lang" role="group" aria-label="{{t "Language"}}">
+  <a href="/lang?l=it&amp;next={{.Path}}" {{if eq .Lang "it"}}class="on" aria-current="true"{{end}} lang="it">IT</a>
+  <a href="/lang?l=en&amp;next={{.Path}}" {{if eq .Lang "en"}}class="on" aria-current="true"{{end}} lang="en">EN</a>
+</div>
+{{end}}
+
+{{define "verdict"}}<span class="badge {{verdictClass .}}">{{t (verdictLabel .)}}</span>{{end}}
 
 {{define "tlp"}}<span class="tlp {{tlpClass .}}">TLP:{{.}}</span>{{end}}
 
-{{/* Source selection fields. Expects a dict-like struct: .Sources []api.Source, .Form api.SearchOptions */}}
+{{/* Source selection fields. Expects .Sources []api.Source and .Form api.SearchOptions. */}}
 {{define "source-options"}}
 <details class="options">
-  <summary>Sources and options</summary>
+  <summary>{{t "Sources and options"}}</summary>
   <div class="options-body">
-    <label class="check"><input type="checkbox" name="offline" {{if .Form.Offline}}checked{{end}}> Offline only <span class="muted">(nothing leaves this machine)</span></label>
-    <label class="check"><input type="checkbox" name="no_cache" {{if .Form.NoCache}}checked{{end}}> Ignore cache</label>
+    <label class="check"><input type="checkbox" name="offline" {{if .Form.Offline}}checked{{end}}> {{t "Offline only"}} <span class="muted">({{t "nothing leaves this machine"}})</span></label>
+    <label class="check"><input type="checkbox" name="no_cache" {{if .Form.NoCache}}checked{{end}}> {{t "Ignore cached results"}}</label>
     <fieldset class="only">
-      <legend>Only these sources <span class="muted">(none selected = all enabled)</span></legend>
+      <legend>{{t "Only these sources"}} <span class="muted">({{t "none selected = all enabled"}})</span></legend>
       {{range .Sources}}
-        <label class="check {{if not .Enabled}}disabled{{end}}" {{if not .Enabled}}title="Disabled: set {{.KeyEnv}}"{{end}}>
+        <label class="check {{if not .Enabled}}disabled{{end}}" {{if not .Enabled}}title="{{t "Disabled: add the key in API keys"}}"{{end}}>
           <input type="checkbox" name="only" value="{{.Name}}" {{if not .Enabled}}disabled{{end}} {{if contains $.Form.Only .Name}}checked{{end}}>
           {{.Name}}{{if .Offline}} <span class="muted">offline</span>{{end}}
         </label>
@@ -26,31 +35,33 @@
 {{define "report"}}
 <article class="card report">
   <header class="report-head">
-    <div>
+    <div class="report-ioc">
       <code class="ioc">{{clean .Indicator.Value}}</code>
       <span class="type">{{.Indicator.Type}}</span>
-      <button type="button" class="btn btn-ghost btn-xs" data-copy="{{.Indicator.Value}}" title="Copy">Copy</button>
-      <button type="button" class="btn btn-ghost btn-xs" data-copy="{{defang .Indicator}}" title="Copy defanged">Copy defanged</button>
     </div>
-    {{template "verdict" .Verdict}}
+    <div class="report-actions">
+      <button type="button" class="btn btn-ghost btn-xs" data-copy="{{.Indicator.Value}}">{{t "Copy"}}</button>
+      <button type="button" class="btn btn-ghost btn-xs" data-copy="{{defang .Indicator}}">{{t "Copy defanged"}}</button>
+      {{template "verdict" .Verdict}}
+    </div>
   </header>
-  {{if not .Results}}<p class="muted">No enabled source supports this indicator type.</p>{{end}}
+  {{if not .Results}}<p class="muted">{{t "No enabled source supports this indicator type."}}</p>{{end}}
   {{range .Results}}
   <details class="result" {{if or .Found .Error}}open{{end}}>
     <summary>
       <span class="provider">{{.Provider}}</span>
-      {{if .Error}}<span class="badge v-error">error</span>
+      {{if .Error}}<span class="badge v-error">{{t "error"}}</span>
       {{else if .Found}}{{if ge .Verdict.Rank 1}}{{template "verdict" .Verdict}}{{end}}
-      {{else}}<span class="badge v-none">no data</span>{{end}}
+      {{else}}<span class="badge v-none">{{t "no data"}}</span>{{end}}
       <span class="summary">{{if .Error}}{{clean .Error}}{{else}}{{clean .Summary}}{{end}}</span>
-      {{if .Cached}}<span class="muted small">cached {{date .FetchedAt}}</span>{{end}}
+      {{if .Cached}}<span class="muted small">{{t "cached"}} {{date .FetchedAt}}</span>{{end}}
     </summary>
     {{if .Fields}}
     <dl class="fields">
       {{range .Fields}}<dt>{{clean .Name}}</dt><dd>{{clean .Value}}</dd>{{end}}
     </dl>
     {{end}}
-    {{if .Reference}}<p class="ref"><a href="{{.Reference}}" target="_blank" rel="noopener noreferrer" hx-boost="false">Open in {{.Provider}} ↗</a></p>{{end}}
+    {{if .Reference}}<p class="ref"><a href="{{.Reference}}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{t "Open in"}} {{.Provider}} ↗</a></p>{{end}}
   </details>
   {{end}}
 </article>

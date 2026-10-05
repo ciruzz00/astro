@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{.Lang}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,28 +11,39 @@
 <script src="{{asset "htmx.min.js"}}" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
 <script src="{{asset "app.js"}}" defer></script>
 </head>
-<body hx-boost="true" hx-indicator="#progress" hx-disabled-elt="find [type=submit]">
+<body class="{{if .User}}app{{else}}public{{end}}" hx-boost="true" hx-indicator="#progress" hx-disabled-elt="find [type=submit]">
 <div id="progress" class="progress" aria-hidden="true"><span></span></div>
 {{if .User}}
-<header class="topbar">
-  <a class="brand" href="/"><img src="{{asset "favicon.svg"}}" alt="" width="22" height="22">astro</a>
-  <nav>
-    <a href="/" {{if eq .Nav "search"}}class="active" aria-current="page"{{end}}>Search</a>
-    <a href="/extract" {{if eq .Nav "extract"}}class="active" aria-current="page"{{end}}>Extract</a>
-    <a href="/cases" {{if eq .Nav "cases"}}class="active" aria-current="page"{{end}}>Cases</a>
-    <a href="/sources" {{if eq .Nav "sources"}}class="active" aria-current="page"{{end}}>Sources</a>
-    <a href="/tokens" {{if eq .Nav "tokens"}}class="active" aria-current="page"{{end}}>API tokens</a>
+<aside class="sidebar">
+  <a class="brand" href="/"><img src="{{asset "favicon.svg"}}" alt="" width="26" height="26"><span>astro</span></a>
+  <nav aria-label="{{t "Main"}}">
+    <p class="nav-group">{{t "Investigate"}}</p>
+    <a href="/" {{if eq .Nav "search"}}class="active" aria-current="page"{{end}}>{{template "icon" "search"}}{{t "Search"}}</a>
+    <a href="/extract" {{if eq .Nav "extract"}}class="active" aria-current="page"{{end}}>{{template "icon" "extract"}}{{t "Extract"}}</a>
+    <a href="/cases" {{if eq .Nav "cases"}}class="active" aria-current="page"{{end}}>{{template "icon" "cases"}}{{t "Cases"}}</a>
+    <p class="nav-group">{{t "Configure"}}</p>
+    <a href="/sources" {{if eq .Nav "sources"}}class="active" aria-current="page"{{end}}>{{template "icon" "sources"}}{{t "Sources"}}</a>
+    <a href="/settings" {{if eq .Nav "settings"}}class="active" aria-current="page"{{end}}>{{template "icon" "key"}}{{t "API keys"}}</a>
+    <a href="/tokens" {{if eq .Nav "tokens"}}class="active" aria-current="page"{{end}}>{{template "icon" "token"}}{{t "Access tokens"}}</a>
+    <p class="nav-group">{{t "Help"}}</p>
+    <a href="/guide" {{if eq .Nav "guide"}}class="active" aria-current="page"{{end}}>{{template "icon" "guide"}}{{t "Guide"}}</a>
   </nav>
-  <form class="logout" method="post" action="/logout">
-    <span class="muted">token: {{.User}}</span>
-    <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
-  </form>
-</header>
+  <div class="sidebar-foot">
+    {{template "lang-switch" .}}
+    <form method="post" action="/logout" class="signout">
+      <span class="who" title="{{t "Signed in with token"}}">{{template "icon" "token"}}{{.User}}</span>
+      <button class="btn btn-ghost btn-sm" type="submit" title="{{t "Sign out"}}">{{template "icon" "logout"}}<span class="sr-only">{{t "Sign out"}}</span></button>
+    </form>
+    <p class="version">astro {{.Version}}</p>
+  </div>
+</aside>
 {{end}}
-<main class="container">
-  {{with .Flash}}<div class="flash flash-{{.Kind}}" role="status">{{.Message}}</div>{{end}}
-  {{template "content" .}}
+<main class="main">
+  <div class="container">
+    {{with .Flash}}<div class="flash flash-{{.Kind}}" role="status">{{.Message}}</div>{{end}}
+    {{template "content" .}}
+  </div>
+  {{if .User}}<footer class="footer">{{t "Online sources receive the indicators you search: use offline mode for sensitive ones."}}</footer>{{end}}
 </main>
-<footer class="footer">astro {{.Version}} · threat intelligence search · online sources receive the indicators you search</footer>
 </body>
 </html>

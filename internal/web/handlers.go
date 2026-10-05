@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ciruzz00/astro/internal/api"
 	"github.com/ciruzz00/astro/internal/engine"
@@ -93,7 +94,7 @@ func (s *server) formOptions(r *http.Request) (engine.SearchOptions, api.SearchO
 		NoCache: r.FormValue("no_cache") == "on",
 		Only:    r.Form["only"],
 	}
-	eo, err := api.ResolveOptions(s.Sources, o)
+	eo, err := api.ResolveOptions(s.Sources(), o)
 	return eo, o, err
 }
 
@@ -123,7 +124,7 @@ func formIndicators(r *http.Request) ([]ioc.Indicator, error) {
 		return nil, errors.New("no indicators found")
 	}
 	if len(inds) > api.MaxSearch {
-		return nil, fmt.Errorf("%d indicators: at most %d per search (use a case to work in batches)", len(inds), api.MaxSearch)
+		return nil, fmt.Errorf("too many indicators: at most %d per search (use a case to work in batches)", api.MaxSearch)
 	}
 	return inds, nil
 }
@@ -139,12 +140,22 @@ func (s *server) openCases(r *http.Request) []store.CaseSummary {
 // --- home and search ---
 
 type homeData struct {
-	Cases    []store.CaseSummary
-	Sources  []api.Source
-	Missing  []string
-	Datasets []store.Dataset
-	Form     api.SearchOptions
+	Cases          []store.CaseSummary
+	Sources        []api.Source
+	Form           api.SearchOptions
+	Missing        []string
+	Stale          []string
+	OpenCases      int
+	Malicious      int
+	Suspicious     int
+	Enabled        int
+	Total          int
+	DatasetsSynced int
+	DatasetsTotal  int
 }
+
+// staleAfter is the age after which an offline dataset should be synced again.
+const staleAfter = 30 * 24 * time.Hour
 
 func (s *server) home(w http.ResponseWriter, r *http.Request) {
 	ds, err := s.Store.Datasets(r.Context())
@@ -152,14 +163,32 @@ func (s *server) home(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	d := homeData{Cases: s.openCases(r), Sources: s.Sources, Datasets: ds}
+	d := homeData{Cases: s.openCases(r), Sources: s.Sources()}
+	d.OpenCases = len(d.Cases)
+	for _, c := range d.Cases {
+		d.Malicious += c.Malicious
+		d.Suspicious += c.Suspicious
+	}
+	for _, src := range d.Sources {
+		d.Total++
+		if src.Enabled {
+			d.Enabled++
+		}
+	}
 	have := map[string]bool{}
 	for _, x := range ds {
 		have[x.Name] = true
+		if s.now().Sub(x.SyncedAt) > staleAfter {
+			d.Stale = append(d.Stale, x.Name)
+		}
 	}
-	for _, src := range datasetNames() {
-		if !have[src] {
-			d.Missing = append(d.Missing, src)
+	names := datasetNames()
+	d.DatasetsTotal = len(names)
+	for _, n := range names {
+		if have[n] {
+			d.DatasetsSynced++
+		} else {
+			d.Missing = append(d.Missing, n)
 		}
 	}
 	s.render(w, r, http.StatusOK, "home", "Search", "search", d)
@@ -183,39 +212,39 @@ func (s *server) searchGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ind, err := ioc.Parse(q)
-	d := resultsData{Query: q, Mode: "list", Cases: s.openCases(r), Sources: s.Sources}
+	d := resultsData{Query: q, Mode: "list", Cases: s.openCases(r), Sources: s.Sources()}
 	if err != nil {
-		d.Error = "Invalid indicator: " + err.Error()
+		d.Error = s.tr(r, "Invalid indicator: %s", s.tr(r, err.Error()))
 		s.render(w, r, http.StatusBadRequest, "results", "Search", "search", d)
 		return
 	}
 	d.Reports = s.Engine.SearchMany(r.Context(), []ioc.Indicator{ind}, engine.SearchOptions{})
-	s.render(w, r, http.StatusOK, "results", "Search: "+q, "search", d)
+	s.render(w, r, http.StatusOK, "results", "Results", "search", d)
 }
 
 func (s *server) searchPost(w http.ResponseWriter, r *http.Request) {
 	if err := parseForm(w, r); err != nil {
-		s.render(w, r, http.StatusBadRequest, "error", "Error", "search", "Invalid form: "+err.Error())
+		s.render(w, r, http.StatusBadRequest, "error", "Error", "search", s.tr(r, "Invalid form: %s", err.Error()))
 		return
 	}
-	d := resultsData{Query: r.FormValue("text"), Mode: r.FormValue("mode"), Cases: s.openCases(r), Sources: s.Sources}
+	d := resultsData{Query: r.FormValue("text"), Mode: r.FormValue("mode"), Cases: s.openCases(r), Sources: s.Sources()}
 	eo, form, err := s.formOptions(r)
 	d.Form = form
 	if err != nil {
-		d.Error = err.Error()
+		d.Error = s.tr(r, err.Error())
 		s.render(w, r, http.StatusBadRequest, "results", "Search", "search", d)
 		return
 	}
 	inds, err := formIndicators(r)
 	if err != nil {
-		d.Error = err.Error()
+		d.Error = s.tr(r, err.Error())
 		s.render(w, r, http.StatusBadRequest, "results", "Search", "search", d)
 		return
 	}
 	d.Reports = s.Engine.SearchMany(r.Context(), inds, eo)
 	if name := r.FormValue("case"); name != "" {
 		if err := s.Cases.Record(r.Context(), name, d.Reports); err != nil {
-			d.Error = "Results not saved: " + caseMessage(name, err)
+			d.Error = s.tr(r, "Results not saved: %s", s.tr(r, caseMessage(name, err)))
 		} else {
 			d.SavedTo = name
 		}
@@ -240,7 +269,7 @@ func (s *server) extractPage(w http.ResponseWriter, r *http.Request) {
 func (s *server) extractPost(w http.ResponseWriter, r *http.Request) {
 	d := extractData{Cases: s.openCases(r), Searched: true}
 	if err := parseForm(w, r); err != nil {
-		d.Error = "Invalid form: " + err.Error()
+		d.Error = s.tr(r, "Invalid form: %s", err.Error())
 		s.render(w, r, http.StatusBadRequest, "extract", "Extract", "extract", d)
 		return
 	}
@@ -276,13 +305,13 @@ func (s *server) addToCase(w http.ResponseWriter, r *http.Request) {
 		s.flashRedirect(w, r, "/cases", "error", caseMessage(name, err))
 		return
 	}
-	msg := fmt.Sprintf("%d new indicators added (%d selected).", added, len(inds))
+	msg := s.tr(r, "%d new indicators added (%d selected).", added, len(inds))
 	if r.FormValue("search") == "on" {
 		eo, _, err := s.formOptions(r)
 		if err == nil {
 			reps, err := s.Cases.Search(r.Context(), name, eo, true)
 			if err == nil {
-				msg += fmt.Sprintf(" %d searched.", len(reps))
+				msg += " " + s.tr(r, "%d searched.", len(reps))
 			}
 		}
 	}

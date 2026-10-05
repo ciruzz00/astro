@@ -43,7 +43,7 @@ func (s *server) sourcesPage(w http.ResponseWriter, r *http.Request) {
 	for _, d := range ds {
 		byName[d.Name] = d
 	}
-	d := sourcesData{Sources: s.Sources}
+	d := sourcesData{Sources: s.Sources()}
 	for _, src := range datasets.Sources {
 		row := datasetRow{Name: src.Name, Description: src.Description}
 		if x, ok := byName[src.Name]; ok {
@@ -73,13 +73,13 @@ func (s *server) syncDatasets(w http.ResponseWriter, r *http.Request) {
 			failed = append(failed, src.Name)
 			continue
 		}
-		ok = append(ok, fmt.Sprintf("%s (%d records, %s)", src.Name, n, time.Since(start).Round(100*time.Millisecond)))
+		ok = append(ok, fmt.Sprintf("%s (%d, %s)", src.Name, n, time.Since(start).Round(100*time.Millisecond)))
 	}
 	if len(failed) > 0 {
-		s.flashRedirect(w, r, "/sources", "error", "Sync failed for "+strings.Join(failed, ", ")+". See the server log.")
+		s.flashRedirect(w, r, "/sources", "error", s.tr(r, "Sync failed for %s. See the server log.", strings.Join(failed, ", ")))
 		return
 	}
-	s.flashRedirect(w, r, "/sources", "ok", "Synced: "+strings.Join(ok, "; ")+".")
+	s.flashRedirect(w, r, "/sources", "ok", s.tr(r, "Synced: %s.", strings.Join(ok, "; ")))
 }
 
 // --- tokens ---
@@ -102,7 +102,7 @@ func (s *server) renderTokens(w http.ResponseWriter, r *http.Request, status int
 		return
 	}
 	d.Tokens, d.Current = list, info(r).tokenName
-	s.render(w, r, status, "tokens", "API tokens", "tokens", d)
+	s.render(w, r, status, "tokens", "Access tokens", "tokens", d)
 }
 
 func (s *server) createToken(w http.ResponseWriter, r *http.Request) {
@@ -128,12 +128,12 @@ func (s *server) revokeToken(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	err := s.Store.RevokeToken(r.Context(), name, time.Now())
 	if errors.Is(err, store.ErrNotFound) {
-		s.flashRedirect(w, r, "/tokens", "error", "No active token named "+name+".")
+		s.flashRedirect(w, r, "/tokens", "error", s.tr(r, "No active token named %s.", name))
 		return
 	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.flashRedirect(w, r, "/tokens", "ok", "Token "+name+" revoked.")
+	s.flashRedirect(w, r, "/tokens", "ok", s.tr(r, "Token %s revoked.", name))
 }

@@ -1,24 +1,23 @@
 {{define "content"}}
 {{with .Data}}
-<section class="page-head">
-  <h1>Results</h1>
-  <a class="btn btn-ghost" href="/">New search</a>
-</section>
+<header class="page-head">
+  <div><h1>{{t "Results"}}</h1>{{if .Reports}}<p class="lead">{{t "%d indicators searched." (len .Reports)}}</p>{{end}}</div>
+  <a class="btn" href="/">{{template "icon" "search"}}{{t "New search"}}</a>
+</header>
 {{with .Error}}<div class="flash flash-error" role="alert">{{.}}</div>{{end}}
-{{with .SavedTo}}<div class="flash flash-ok">Results saved to case <a href="/cases/{{.}}">{{.}}</a>.</div>{{end}}
+{{with .SavedTo}}<div class="flash flash-ok">{{t "Results saved to case"}} <a href="/cases/{{.}}">{{.}}</a>.</div>{{end}}
 
 {{if .Reports}}
 <form class="card toolbar" method="post" action="/add-to-case">
   {{range .Reports}}<input type="hidden" name="ioc" value="{{.Indicator.Value}}">{{end}}
-  <span><strong>{{len .Reports}}</strong> indicators searched.</span>
-  <label class="inline">Add all to case
+  <label class="inline">{{t "Add all to case"}}
     <select name="case" required>
-      <option value="">— choose —</option>
+      <option value="">{{t "— choose —"}}</option>
       {{range .Cases}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
     </select>
   </label>
-  <button class="btn btn-sm" type="submit">Add</button>
-  <a class="btn btn-ghost btn-sm" href="/cases">New case…</a>
+  <button class="btn btn-sm" type="submit">{{template "icon" "plus"}}{{t "Add"}}</button>
+  <a class="btn btn-ghost btn-sm" href="/cases">{{t "New case…"}}</a>
 </form>
 {{range .Reports}}{{template "report" .}}{{end}}
 {{end}}
