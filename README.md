@@ -7,8 +7,8 @@ detected automatically and looked up across many intelligence feeds at once.
 Built for incident response, threat hunting and CTF/DFIR challenges
 (Hack The Box Sherlocks, TryHackMe).
 
-> **Status:** early development. The CLI and the offline/keyless sources work;
-> keyed providers, REST API, web UI, TUI, cases and PDF reports are on the roadmap.
+> **Status:** early development. The CLI and all the sources below work;
+> REST API, web UI, TUI, cases and PDF reports are on the roadmap.
 
 ## Features
 
@@ -24,16 +24,31 @@ Built for incident response, threat hunting and CTF/DFIR challenges
 
 ## Sources
 
-| Source | Indicators | API key |
-|---|---|---|
-| MITRE ATT&CK (offline) | ATT&CK IDs, group/software/campaign names | no |
-| NVD | CVE | optional |
-| CISA KEV (offline) | CVE | no |
-| FIRST EPSS | CVE | no |
-| IEEE OUI (offline) | MAC address | no |
+| Source | Indicators | API key | Network |
+|---|---|---|---|
+| MITRE ATT&CK | ATT&CK IDs, group/software/campaign names | no | offline |
+| VirusTotal | hash, IP, domain, URL | required | online |
+| MalwareBazaar (abuse.ch) | MD5, SHA1, SHA256 | required | online |
+| ThreatFox (abuse.ch) | hash, IP, domain, URL | required | online |
+| URLhaus (abuse.ch) | URL, domain, IP, MD5/SHA256 payloads | required | online |
+| AbuseIPDB | IP | required | online |
+| AlienVault OTX | hash, IP, domain, URL, CVE | required | online |
+| GreyNoise Community | IPv4 | optional | online |
+| Shodan (InternetDB without a key) | IP | optional | online |
+| NVD | CVE | optional | online |
+| CISA KEV | CVE | no | offline |
+| FIRST EPSS | CVE | no | online |
+| IEEE OUI | MAC address | no | offline |
 
-Planned: VirusTotal, abuse.ch (MalwareBazaar, ThreatFox, URLhaus), AbuseIPDB,
-AlienVault OTX, Shodan, GreyNoise.
+`astro providers` shows which sources are enabled with your keys. Sources that
+require a key are skipped until it is set.
+
+### OPSEC
+
+Online sources receive the indicator you search, and some (like VirusTotal)
+share lookups with their community. For sensitive indicators, such as internal
+hostnames or unreleased samples, use `--offline` (offline datasets only) or
+pick sources with `--only`.
 
 ## Install
 
@@ -56,6 +71,9 @@ astro search 00:50:56:aa:bb:cc               # MAC vendor, VM detection
 astro search --file incident.log             # search every IOC in a file
 astro extract --defang report.txt            # extract IOCs without searching
 astro search --json 8.8.8.8 | jq .
+astro search --offline 10.0.0.5              # nothing leaves this machine
+astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f
+astro providers                              # enabled sources and missing keys
 ```
 
 ## Configuration
@@ -95,9 +113,9 @@ Limits change over time: check each provider's terms.
 
 Everything runs in Docker: no Go toolchain is needed on the host.
 
-To try astro without installing anything, open a shell in the dev container
-with `astro` built and on the `PATH` (keys from `.env` are loaded, datasets
-persist in the `astro-data` volume):
+To try astro without installing anything, open a shell in a container with
+`astro` built and on the `PATH`. Keys from `.env` are loaded only here (tests and
+linters run without them) and datasets persist in the `astro-data` volume:
 
 ```sh
 make try
