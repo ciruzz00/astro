@@ -1,0 +1,16 @@
+# Secrets
+.env
+*.pem
+*.key
+
+# Local data
+*.db
+*.db-shm
+*.db-wal
+
+# Build output
+/dist/
+/astro
+*.exe
+*.test
+coverage.out

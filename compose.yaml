@@ -1,0 +1,28 @@
+name: astro
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        UID: "${HOST_UID:-1000}"
+        GID: "${HOST_GID:-1000}"
+    image: astro-dev:local
+    working_dir: /src
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - .:/src
+      - gomod:/home/dev/go/pkg/mod
+      - gobuild:/home/dev/.cache/go-build
+      - data:/data
+
+volumes:
+  gomod:
+    name: astro-gomod
+  gobuild:
+    name: astro-gobuild
+  data:
+    name: astro-data
