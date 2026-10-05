@@ -2,6 +2,7 @@ package ioc
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -44,6 +45,21 @@ func Defang(i Indicator) string {
 		return strings.ReplaceAll(strings.Replace(v, "@", "[@]", 1), ".", "[.]")
 	}
 	return v
+}
+
+// DefangText defangs every URL, domain, IP and email found in free text, so
+// notes written by analysts are as safe to share as indicator lists.
+func DefangText(text string) string {
+	inds := Extract(text)
+	// Longest first, so a URL is replaced before the domain inside it.
+	sort.Slice(inds, func(a, b int) bool { return len(inds[a].Value) > len(inds[b].Value) })
+	for _, i := range inds {
+		switch i.Type {
+		case URL, Domain, IPv4, Email:
+			text = strings.ReplaceAll(text, i.Value, Defang(i))
+		}
+	}
+	return text
 }
 
 // MaxExtract caps the number of indicators returned by Extract.

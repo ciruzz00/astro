@@ -149,3 +149,11 @@ func TestExtractCap(t *testing.T) {
 		t.Errorf("Extract returned %d indicators, want cap %d", n, MaxExtract)
 	}
 }
+
+func TestDefangText(t *testing.T) {
+	in := "Blocked 203.0.113.7 and https://evil.example.com/x (contact soc@example.org); evil.example.com is still up."
+	want := "Blocked 203[.]0[.]113[.]7 and hxxps[://]evil[.]example[.]com/x (contact soc[@]example[.]org); evil[.]example[.]com is still up."
+	if got := DefangText(in); got != want {
+		t.Errorf("DefangText =\n%s\nwant\n%s", got, want)
+	}
+}
