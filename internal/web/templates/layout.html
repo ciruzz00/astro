@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true,"selfRequestsOnly":true,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}'>
+<title>{{.Title}} · astro</title>
+<link rel="icon" href="{{asset "favicon.svg"}}" type="image/svg+xml">
+<link rel="stylesheet" href="{{asset "style.css"}}">
+<script src="{{asset "htmx.min.js"}}" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
+<script src="{{asset "app.js"}}" defer></script>
+</head>
+<body hx-boost="true" hx-indicator="#progress" hx-disabled-elt="find [type=submit]">
+<div id="progress" class="progress" aria-hidden="true"><span></span></div>
+{{if .User}}
+<header class="topbar">
+  <a class="brand" href="/"><img src="{{asset "favicon.svg"}}" alt="" width="22" height="22">astro</a>
+  <nav>
+    <a href="/" {{if eq .Nav "search"}}class="active" aria-current="page"{{end}}>Search</a>
+    <a href="/extract" {{if eq .Nav "extract"}}class="active" aria-current="page"{{end}}>Extract</a>
+    <a href="/cases" {{if eq .Nav "cases"}}class="active" aria-current="page"{{end}}>Cases</a>
+    <a href="/sources" {{if eq .Nav "sources"}}class="active" aria-current="page"{{end}}>Sources</a>
+    <a href="/tokens" {{if eq .Nav "tokens"}}class="active" aria-current="page"{{end}}>API tokens</a>
+  </nav>
+  <form class="logout" method="post" action="/logout">
+    <span class="muted">token: {{.User}}</span>
+    <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+  </form>
+</header>
+{{end}}
+<main class="container">
+  {{with .Flash}}<div class="flash flash-{{.Kind}}" role="status">{{.Message}}</div>{{end}}
+  {{template "content" .}}
+</main>
+<footer class="footer">astro {{.Version}} · threat intelligence search · online sources receive the indicators you search</footer>
+</body>
+</html>

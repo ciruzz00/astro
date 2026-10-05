@@ -1,0 +1,45 @@
+{{define "content"}}
+{{with .Data}}
+<section class="page-head">
+  <h1>Cases</h1>
+  <div class="row">
+    {{if .All}}<a class="btn btn-ghost btn-sm" href="/cases">Open only</a>{{else}}<a class="btn btn-ghost btn-sm" href="/cases?all=1">Include closed</a>{{end}}
+  </div>
+</section>
+
+<details class="card new-case" {{if not .Cases}}open{{end}}>
+  <summary class="btn btn-primary">New case</summary>
+  <form method="post" action="/cases" class="form-grid">
+    <label>Name <span class="muted">(letters, digits, . _ -)</span>
+      <input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" placeholder="sherlock-brutus"></label>
+    <label>Title <input name="title" maxlength="200" placeholder="HTB Sherlock: Brutus"></label>
+    <label>TLP
+      <select name="tlp">{{range .TLPs}}<option value="{{.}}" {{if eq . "AMBER"}}selected{{end}}>TLP:{{.}}</option>{{end}}</select></label>
+    <label>Tags <span class="muted">(comma separated)</span><input name="tags" placeholder="htb, dfir"></label>
+    <div><button class="btn btn-primary" type="submit">Create case</button></div>
+  </form>
+</details>
+
+{{if .Cases}}
+<section class="card">
+  <table class="table">
+    <thead><tr><th>Case</th><th>TLP</th><th>Status</th><th>Tags</th><th class="num">IOCs</th><th class="num">Malicious</th><th class="num">Suspicious</th><th>Updated</th></tr></thead>
+    <tbody>
+    {{range .Cases}}
+      <tr>
+        <td><a href="/cases/{{.Name}}"><strong>{{.Name}}</strong></a><div class="muted small">{{.Title}}</div></td>
+        <td>{{template "tlp" .TLP}}</td>
+        <td><span class="status status-{{.Status}}">{{.Status}}</span></td>
+        <td>{{range .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
+        <td class="num">{{.Indicators}}</td>
+        <td class="num">{{if .Malicious}}<span class="badge v-malicious">{{.Malicious}}</span>{{else}}0{{end}}</td>
+        <td class="num">{{if .Suspicious}}<span class="badge v-suspicious">{{.Suspicious}}</span>{{else}}0{{end}}</td>
+        <td class="small">{{date .UpdatedAt}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}
+{{end}}
+{{end}}

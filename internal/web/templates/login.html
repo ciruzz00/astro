@@ -1,0 +1,14 @@
+{{define "content"}}
+<section class="login card">
+  <div class="login-brand"><img src="{{asset "favicon.svg"}}" alt="" width="40" height="40"><h1>astro</h1></div>
+  <p class="muted">Threat intelligence search. Sign in with an API token.</p>
+  {{with .Data}}<div class="flash flash-error" role="alert">{{.}}</div>{{end}}
+  <form method="post" action="/login" hx-boost="false">
+    <label for="token">API token</label>
+    <input id="token" name="token" type="password" autocomplete="current-password" required autofocus
+           placeholder="astro_…" pattern="astro_[A-Za-z0-9_\-]{43}">
+    <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+  </form>
+  <p class="hint">Create a token on the server with <code>astro token create web</code> (or <code>make token NAME=web</code>).</p>
+</section>
+{{end}}

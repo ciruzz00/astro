@@ -1,0 +1,46 @@
+{{define "content"}}
+{{with .Data}}
+<section class="page-head"><h1>Sources</h1></section>
+
+<section class="card">
+  <header class="card-head"><h2>Intelligence sources</h2></header>
+  <p class="muted">Sources that need an API key are enabled when the key is set on the server (environment or <code>config.toml</code>), then the server is restarted.</p>
+  <table class="table">
+    <thead><tr><th>Source</th><th>Status</th><th>Where</th><th>Indicators</th></tr></thead>
+    <tbody>
+    {{range .Sources}}
+      <tr>
+        <td><strong>{{.Name}}</strong></td>
+        <td>{{if .Enabled}}<span class="badge v-clean">enabled</span>{{else}}<span class="badge v-none">disabled</span> <span class="muted small">set <code>{{.KeyEnv}}</code></span>{{end}}</td>
+        <td>{{if .Offline}}offline{{else}}online{{end}}</td>
+        <td class="small">{{join .Indicators ", "}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <header class="card-head"><h2>Offline datasets</h2></header>
+  <form method="post" action="/sources/sync">
+    <table class="table">
+      <thead><tr><th class="check-col"></th><th>Dataset</th><th>Records</th><th>Version</th><th>Last sync</th></tr></thead>
+      <tbody>
+      {{range .Datasets}}
+        <tr>
+          <td class="check-col"><input type="checkbox" name="dataset" value="{{.Name}}" aria-label="Sync {{.Name}}"></td>
+          <td><strong>{{.Name}}</strong><div class="muted small">{{.Description}}</div></td>
+          {{with .Synced}}<td>{{.Records}}</td><td>{{.Version}}</td><td class="small">{{date .SyncedAt}}</td>
+          {{else}}<td colspan="3"><span class="badge v-suspicious">never synced</span></td>{{end}}
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <div class="row">
+      <button class="btn btn-primary" type="submit">Sync selected (all if none)</button>
+      <span class="muted small">Downloads from MITRE, CISA and IEEE; takes a few seconds.</span>
+    </div>
+  </form>
+</section>
+{{end}}
+{{end}}

@@ -1,0 +1,54 @@
+{{define "content"}}
+{{with .Data}}
+{{if .Missing}}
+<div class="flash flash-warn">Offline datasets not synced yet: {{join .Missing ", "}}. <a href="/sources">Sync them</a> to search ATT&amp;CK, KEV and MAC vendors.</div>
+{{end}}
+<section class="hero">
+  <h1>Search</h1>
+  <p class="muted">Hashes, IPs, domains, URLs, emails, CVEs, ATT&amp;CK IDs, MAC addresses or threat names. Defanged input is accepted.</p>
+  <form class="search-form card" method="post" action="/search" enctype="multipart/form-data">
+    <textarea name="text" rows="4" placeholder="One indicator per line, e.g.&#10;44d88612fea8a8f36de82e1278abb02f&#10;hxxps://evil[.]example[.]com&#10;CVE-2021-44228&#10;Lazarus Group" autofocus></textarea>
+    <div class="row wrap">
+      <div class="segmented" role="radiogroup" aria-label="Input mode">
+        <label><input type="radio" name="mode" value="list" checked> One per line</label>
+        <label><input type="radio" name="mode" value="text"> Extract from text</label>
+      </div>
+      <label class="file">Or upload a log/report <input type="file" name="file"></label>
+      <label class="inline">Save to case
+        <select name="case">
+          <option value="">— none —</option>
+          {{range .Cases}}<option value="{{.Name}}">{{.Name}}{{with .Title}} · {{.}}{{end}}</option>{{end}}
+        </select>
+      </label>
+      <button class="btn btn-primary" type="submit">Search</button>
+    </div>
+    {{template "source-options" .}}
+  </form>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <header class="card-head"><h2>Open cases</h2><a class="btn btn-ghost btn-sm" href="/cases">All cases</a></header>
+    {{if .Cases}}
+    <table class="table">
+      <thead><tr><th>Case</th><th>TLP</th><th class="num">IOCs</th><th class="num">Malicious</th><th>Updated</th></tr></thead>
+      <tbody>
+      {{range .Cases}}
+        <tr><td><a href="/cases/{{.Name}}">{{.Name}}</a><div class="muted small">{{.Title}}</div></td>
+          <td>{{template "tlp" .TLP}}</td><td class="num">{{.Indicators}}</td>
+          <td class="num">{{if .Malicious}}<span class="badge v-malicious">{{.Malicious}}</span>{{else}}0{{end}}</td>
+          <td class="small">{{date .UpdatedAt}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+    {{else}}<p class="muted">No open cases. <a href="/cases">Create one</a> to collect indicators and notes.</p>{{end}}
+  </section>
+  <section class="card">
+    <header class="card-head"><h2>Sources</h2><a class="btn btn-ghost btn-sm" href="/sources">Manage</a></header>
+    <ul class="chips">
+      {{range .Sources}}<li class="chip {{if .Enabled}}chip-on{{else}}chip-off{{end}}" {{if not .Enabled}}title="Set {{.KeyEnv}} to enable"{{end}}>{{.Name}}</li>{{end}}
+    </ul>
+  </section>
+</div>
+{{end}}
+{{end}}

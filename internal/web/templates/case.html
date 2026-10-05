@@ -1,0 +1,139 @@
+{{define "content"}}
+{{with .Data}}{{$c := .View.Case}}{{$base := printf "/cases/%s" $c.Name}}
+<section class="page-head case-head">
+  <div>
+    <div class="row">{{template "tlp" $c.TLP}} <span class="status status-{{$c.Status}}">{{$c.Status}}</span></div>
+    <h1>{{if $c.Title}}{{$c.Title}}{{else}}{{$c.Name}}{{end}}</h1>
+    <p class="muted small"><code>{{$c.Name}}</code> · created {{date $c.CreatedAt}} · updated {{date $c.UpdatedAt}}</p>
+  </div>
+  <div class="actions">
+    <form method="post" action="{{$base}}/search"><input type="hidden" name="scope" value="pending">
+      <button class="btn btn-primary" type="submit" {{if not .Pending}}disabled title="Every indicator has been searched"{{end}}>Search new ({{.Pending}})</button></form>
+    <form method="post" action="{{$base}}/search"><input type="hidden" name="scope" value="all">
+      <button class="btn" type="submit" {{if not .View.Items}}disabled{{end}}>Search all again</button></form>
+    <div class="dropdown">
+      <details><summary class="btn">Export</summary>
+        <div class="menu">
+          <a href="{{$base}}/export?format=md" hx-boost="false" download>Markdown report</a>
+          <a href="{{$base}}/export?format=json" hx-boost="false" download>JSON</a>
+          <a href="{{$base}}/export?format=stix" hx-boost="false" download>STIX 2.1 bundle</a>
+          <a href="{{$base}}/export?format=navigator" hx-boost="false" download>ATT&amp;CK Navigator layer</a>
+        </div>
+      </details>
+    </div>
+    <form method="post" action="{{$base}}/status">
+      {{if eq $c.Status "open"}}<input type="hidden" name="status" value="closed"><button class="btn btn-ghost" type="submit">Close case</button>
+      {{else}}<input type="hidden" name="status" value="open"><button class="btn btn-ghost" type="submit">Reopen</button>{{end}}
+    </form>
+  </div>
+</section>
+
+{{with $c.Description}}<p class="description">{{.}}</p>{{end}}
+
+<section class="stats">
+  <div class="stat"><span class="stat-n">{{len .View.Items}}</span><span>indicators</span></div>
+  <div class="stat s-malicious"><span class="stat-n">{{.Malicious}}</span><span>malicious</span></div>
+  <div class="stat s-suspicious"><span class="stat-n">{{.Suspicious}}</span><span>suspicious</span></div>
+  <div class="stat s-clean"><span class="stat-n">{{.Clean}}</span><span>clean</span></div>
+  <div class="stat"><span class="stat-n">{{.Pending}}</span><span>not searched</span></div>
+</section>
+
+<section class="card">
+  <header class="card-head"><h2>Tags</h2></header>
+  <div class="row wrap">
+    {{range $c.Tags}}
+      <form method="post" action="{{$base}}/tags" class="tag-form">
+        <input type="hidden" name="remove" value="{{.}}">
+        <span class="tag">{{.}} <button type="submit" class="tag-x" title="Remove tag {{.}}" aria-label="Remove tag {{.}}">×</button></span>
+      </form>
+    {{else}}<span class="muted">No tags.</span>{{end}}
+    <form method="post" action="{{$base}}/tags" class="row">
+      <input name="add" placeholder="add tags, comma separated" aria-label="New tags" required>
+      <button class="btn btn-sm" type="submit">Add</button>
+    </form>
+  </div>
+</section>
+
+<section class="card" id="indicators">
+  <header class="card-head"><h2>Indicators</h2></header>
+  {{if .View.Items}}
+  <table class="table items">
+    <thead><tr><th>Verdict</th><th>Type</th><th>Indicator</th><th>Flagged by</th><th>Note</th><th>Searched</th><th></th></tr></thead>
+    <tbody>
+    {{range .View.Items}}
+      <tr>
+        <td>{{if .SearchedAt}}{{template "verdict" .Verdict}}{{else}}<span class="badge v-none">not searched</span>{{end}}</td>
+        <td><span class="type">{{.Indicator.Type}}</span></td>
+        <td><code>{{clean .Indicator.Value}}</code> <button type="button" class="btn btn-ghost btn-xs" data-copy="{{defang .Indicator}}" title="Copy defanged">Copy</button></td>
+        <td class="small">{{join (flagged .Report) ", "}}</td>
+        <td class="small">{{clean .Note}}</td>
+        <td class="small">{{date .SearchedAt}}</td>
+        <td class="row-actions">
+          <form method="post" action="{{$base}}/items/remove"><input type="hidden" name="ioc" value="{{.Indicator.Value}}">
+            <button class="btn btn-ghost btn-xs danger" type="submit" title="Remove from case">Remove</button></form>
+        </td>
+      </tr>
+      {{if .Report}}
+      <tr class="detail-row"><td colspan="7">
+        <details><summary class="small">Show results</summary>{{template "report" .Report}}</details>
+      </td></tr>
+      {{end}}
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}<p class="muted">No indicators yet: add some below.</p>{{end}}
+
+  <details class="add-iocs" {{if not .View.Items}}open{{end}}>
+    <summary class="btn btn-sm">Add indicators</summary>
+    <form method="post" action="{{$base}}/indicators" enctype="multipart/form-data">
+      <textarea name="text" rows="5" placeholder="One indicator per line, or paste text and choose 'Extract from text'"></textarea>
+      <div class="row wrap">
+        <div class="segmented" role="radiogroup" aria-label="Input mode">
+          <label><input type="radio" name="mode" value="list" checked> One per line</label>
+          <label><input type="radio" name="mode" value="text"> Extract from text</label>
+        </div>
+        <label class="file">Or upload a file <input type="file" name="file"></label>
+        <input name="note" placeholder="note (optional)" maxlength="500" aria-label="Note">
+        <label class="check"><input type="checkbox" name="search" checked> Search them now</label>
+        <button class="btn btn-primary" type="submit">Add</button>
+      </div>
+      {{template "source-options" .}}
+    </form>
+  </details>
+</section>
+
+<section class="card" id="notes">
+  <header class="card-head"><h2>Notes</h2></header>
+  {{range $c.Notes}}
+    <article class="note"><header class="muted small">{{date .CreatedAt}}</header><div class="note-body">{{.Body}}</div></article>
+  {{else}}<p class="muted">No notes yet.</p>{{end}}
+  <form method="post" action="{{$base}}/notes">
+    <textarea name="body" rows="3" required placeholder="Findings, timeline, next steps… (Markdown is kept in exports)"></textarea>
+    <button class="btn btn-sm" type="submit">Add note</button>
+  </form>
+</section>
+
+<section class="card">
+  <details>
+    <summary><h2 class="inline-h">Edit case</h2></summary>
+    <form method="post" action="{{$base}}/edit" class="form-grid">
+      <label>Title <input name="title" value="{{$c.Title}}" maxlength="200"></label>
+      <label>TLP <select name="tlp">{{range $.Data.TLPs}}<option value="{{.}}" {{if eq . $c.TLP}}selected{{end}}>TLP:{{.}}</option>{{end}}</select></label>
+      <label class="span-2">Description <textarea name="description" rows="3">{{$c.Description}}</textarea></label>
+      <div><button class="btn btn-primary" type="submit">Save</button></div>
+    </form>
+  </details>
+</section>
+
+<section class="card danger-zone" id="danger">
+  <details>
+    <summary><h2 class="inline-h">Delete case</h2></summary>
+    <p>This permanently deletes the case, its indicators and notes. Closing it keeps everything.</p>
+    <form method="post" action="{{$base}}/delete" class="row">
+      <input name="confirm" required placeholder="type {{$c.Name}} to confirm" aria-label="Case name confirmation" autocomplete="off">
+      <button class="btn btn-danger" type="submit">Delete permanently</button>
+    </form>
+  </details>
+</section>
+{{end}}
+{{end}}

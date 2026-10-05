@@ -1,0 +1,53 @@
+{{define "content"}}
+{{with .Data}}
+<section class="page-head">
+  <h1>Extract indicators</h1>
+</section>
+<p class="muted">Paste a log, report or email, or upload a file: indicators are extracted, refanged and de-duplicated locally, without querying any source.</p>
+{{with .Error}}<div class="flash flash-error" role="alert">{{.}}</div>{{end}}
+
+<form class="card" method="post" action="/extract" enctype="multipart/form-data">
+  <textarea name="text" rows="8" placeholder="Paste text here…">{{.Text}}</textarea>
+  <div class="row wrap">
+    <label class="file">Or upload a file <input type="file" name="file"></label>
+    <button class="btn btn-primary" type="submit">Extract</button>
+  </div>
+</form>
+
+{{if .Searched}}
+<section class="card">
+  <header class="card-head"><h2>{{len .Indicators}} indicators found</h2></header>
+  {{if .Indicators}}
+  <form method="post" action="/search" id="extracted">
+    <input type="hidden" name="mode" value="list">
+    <table class="table">
+      <thead><tr><th class="check-col"><input type="checkbox" data-check-all="ioc" checked aria-label="Select all"></th><th>Type</th><th>Indicator</th><th>Defanged</th></tr></thead>
+      <tbody>
+      {{range .Indicators}}
+        <tr>
+          <td class="check-col"><input type="checkbox" name="ioc" value="{{.Value}}" checked aria-label="Select {{.Value}}"></td>
+          <td><span class="type">{{.Type}}</span></td>
+          <td><code>{{clean .Value}}</code></td>
+          <td><code class="muted">{{defang .}}</code> <button type="button" class="btn btn-ghost btn-xs" data-copy="{{defang .}}">Copy</button></td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    <div class="row wrap">
+      <button class="btn btn-primary" type="submit">Search selected</button>
+      <span class="muted">or</span>
+      <label class="inline">add to case
+        <select name="case">
+          <option value="">— choose —</option>
+          {{range .Cases}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" name="search"> and search them</label>
+      <button class="btn" type="submit" formaction="/add-to-case">Add to case</button>
+    </div>
+  </form>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+{{end}}
