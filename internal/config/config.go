@@ -60,21 +60,65 @@ type Config struct {
 	HTTPTimeout time.Duration `toml:"http_timeout"`
 	CacheTTL    time.Duration `toml:"cache_ttl"`
 	Keys        Keys          `toml:"keys"`
+	// KeyOrigin records where each set key came from: OriginEnv or OriginFile.
+	KeyOrigin map[string]string `toml:"-"`
+}
+
+// Key origins, in order of precedence.
+const (
+	OriginEnv      = "env"
+	OriginDatabase = "database"
+	OriginFile     = "file"
+)
+
+// KeyDef describes an API key astro can use.
+type KeyDef struct {
+	Name  string // config file key and identifier ("virustotal")
+	Env   string // environment variable
+	Label string // human-readable service name
+	URL   string // where to get a key
+	field func(*Keys) *Secret
+}
+
+// Field returns the key of this definition in k.
+func (d KeyDef) Field(k *Keys) *Secret { return d.field(k) }
+
+// KeyDefs lists every supported API key.
+var KeyDefs = []KeyDef{
+	{"virustotal", "ASTRO_VIRUSTOTAL_KEY", "VirusTotal", "https://www.virustotal.com/gui/my-apikey", func(k *Keys) *Secret { return &k.VirusTotal }},
+	{"abusech", "ASTRO_ABUSECH_KEY", "abuse.ch (MalwareBazaar, ThreatFox, URLhaus)", "https://auth.abuse.ch/", func(k *Keys) *Secret { return &k.AbuseCH }},
+	{"abuseipdb", "ASTRO_ABUSEIPDB_KEY", "AbuseIPDB", "https://www.abuseipdb.com/account/api", func(k *Keys) *Secret { return &k.AbuseIPDB }},
+	{"otx", "ASTRO_OTX_KEY", "AlienVault OTX", "https://otx.alienvault.com/settings", func(k *Keys) *Secret { return &k.OTX }},
+	{"shodan", "ASTRO_SHODAN_KEY", "Shodan", "https://account.shodan.io/", func(k *Keys) *Secret { return &k.Shodan }},
+	{"greynoise", "ASTRO_GREYNOISE_KEY", "GreyNoise", "https://viz.greynoise.io/account/api-key", func(k *Keys) *Secret { return &k.GreyNoise }},
+	{"nvd", "ASTRO_NVD_KEY", "NVD", "https://nvd.nist.gov/developers/request-an-api-key", func(k *Keys) *Secret { return &k.NVD }},
+}
+
+// KeyDefByName returns the definition of a key.
+func KeyDefByName(name string) (KeyDef, bool) {
+	for _, d := range KeyDefs {
+		if d.Name == name {
+			return d, true
+		}
+	}
+	return KeyDef{}, false
+}
+
+// ValidateKeyValue rejects values that cannot be API keys.
+func ValidateKeyValue(v string) error {
+	if len(v) < 8 || len(v) > 512 {
+		return errors.New("an API key must be 8 to 512 characters long")
+	}
+	for _, r := range v {
+		if r <= ' ' || r > '~' {
+			return errors.New("an API key may only contain printable ASCII characters, without spaces")
+		}
+	}
+	return nil
 }
 
 // FileName is the name of the config file inside the data directory.
 const FileName = "config.toml"
-
-// envKeys maps environment variables to the key they set.
-var envKeys = map[string]func(*Keys) *Secret{
-	"ASTRO_VIRUSTOTAL_KEY": func(k *Keys) *Secret { return &k.VirusTotal },
-	"ASTRO_ABUSECH_KEY":    func(k *Keys) *Secret { return &k.AbuseCH },
-	"ASTRO_ABUSEIPDB_KEY":  func(k *Keys) *Secret { return &k.AbuseIPDB },
-	"ASTRO_OTX_KEY":        func(k *Keys) *Secret { return &k.OTX },
-	"ASTRO_SHODAN_KEY":     func(k *Keys) *Secret { return &k.Shodan },
-	"ASTRO_GREYNOISE_KEY":  func(k *Keys) *Secret { return &k.GreyNoise },
-	"ASTRO_NVD_KEY":        func(k *Keys) *Secret { return &k.NVD },
-}
 
 // DefaultDataDir returns $ASTRO_DATA_DIR or the per-user config directory.
 func DefaultDataDir() (string, error) {
@@ -95,6 +139,7 @@ func Load(dataDir string) (*Config, error) {
 		DataDir:     dataDir,
 		HTTPTimeout: 20 * time.Second,
 		CacheTTL:    24 * time.Hour,
+		KeyOrigin:   map[string]string{},
 	}
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
@@ -115,9 +160,13 @@ func Load(dataDir string) (*Config, error) {
 		}
 	}
 
-	for name, field := range envKeys {
-		if v := os.Getenv(name); v != "" {
-			*field(&cfg.Keys) = Secret(v)
+	for _, d := range KeyDefs {
+		if d.Field(&cfg.Keys).IsSet() {
+			cfg.KeyOrigin[d.Name] = OriginFile
+		}
+		if v := os.Getenv(d.Env); v != "" {
+			*d.Field(&cfg.Keys) = Secret(v)
+			cfg.KeyOrigin[d.Name] = OriginEnv
 		}
 	}
 	if cfg.HTTPTimeout <= 0 || cfg.HTTPTimeout > 5*time.Minute {

@@ -35,8 +35,8 @@ func TestSecretNeverLeaks(t *testing.T) {
 // influence (or be printed by) these tests.
 func clearEnv(t *testing.T) {
 	t.Helper()
-	for name := range envKeys {
-		t.Setenv(name, "")
+	for _, d := range KeyDefs {
+		t.Setenv(d.Env, "")
 	}
 }
 
@@ -66,6 +66,9 @@ func TestLoadFileAndEnv(t *testing.T) {
 	if cfg.Keys.Shodan.IsSet() {
 		t.Error("Shodan key should be unset")
 	}
+	if cfg.KeyOrigin["virustotal"] != OriginFile || cfg.KeyOrigin["nvd"] != OriginEnv || cfg.KeyOrigin["shodan"] != "" {
+		t.Errorf("KeyOrigin = %v", cfg.KeyOrigin)
+	}
 }
 
 func TestLoadRejectsWorldReadableFile(t *testing.T) {
@@ -93,5 +96,16 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.HTTPTimeout != 20*time.Second || cfg.CacheTTL != 24*time.Hour {
 		t.Errorf("unexpected defaults: %+v", cfg)
+	}
+}
+
+func TestValidateKeyValue(t *testing.T) {
+	for v, ok := range map[string]bool{"abcdef12": true, "short": false, "has space 123": false, "tab\tkey1234": false, "àccentedkey": false} {
+		if err := ValidateKeyValue(v); (err == nil) != ok {
+			t.Errorf("ValidateKeyValue(%q) = %v", v, err)
+		}
+	}
+	if _, ok := KeyDefByName("virustotal"); !ok {
+		t.Error("virustotal key definition missing")
 	}
 }
