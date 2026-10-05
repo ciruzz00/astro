@@ -55,6 +55,13 @@ func (s *Store) TouchToken(ctx context.Context, id int64, now time.Time) error {
 	return err
 }
 
+// TokenActive reports whether the token exists and is not revoked.
+func (s *Store) TokenActive(ctx context.Context, id int64) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_tokens WHERE id = ? AND revoked_at IS NULL`, id).Scan(&n)
+	return n == 1, err
+}
+
 // Tokens lists every token, revoked ones included.
 func (s *Store) Tokens(ctx context.Context) ([]Token, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+tokenCols+` FROM api_tokens ORDER BY id`)

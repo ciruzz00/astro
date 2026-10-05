@@ -263,12 +263,18 @@ func (s *server) enrich(w http.ResponseWriter, r *http.Request) {
 
 // engineOptions validates source selection against the configured sources.
 func (s *server) engineOptions(o SearchOptions) (engine.SearchOptions, error) {
+	return ResolveOptions(s.Sources, o)
+}
+
+// ResolveOptions turns user search options into engine options, checking
+// that requested sources exist and are enabled.
+func ResolveOptions(sources []Source, o SearchOptions) (engine.SearchOptions, error) {
 	eo := engine.SearchOptions{NoCache: o.NoCache}
 	if o.Offline {
 		if len(o.Only) > 0 {
 			return eo, errors.New("offline and only are mutually exclusive")
 		}
-		for _, src := range s.Sources {
+		for _, src := range sources {
 			if src.Offline {
 				eo.Only = append(eo.Only, src.Name)
 			}
@@ -276,17 +282,20 @@ func (s *server) engineOptions(o SearchOptions) (engine.SearchOptions, error) {
 		return eo, nil
 	}
 	for _, name := range o.Only {
-		i := slices.IndexFunc(s.Sources, func(src Source) bool { return src.Name == name })
+		i := slices.IndexFunc(sources, func(src Source) bool { return src.Name == name })
 		switch {
 		case i < 0:
 			return eo, fmt.Errorf("unknown source %q", name)
-		case !s.Sources[i].Enabled:
+		case !sources[i].Enabled:
 			return eo, fmt.Errorf("source %q is disabled on this server", name)
 		}
 	}
 	eo.Only = o.Only
 	return eo, nil
 }
+
+// ParseIndicators parses and de-duplicates indicators.
+func ParseIndicators(values []string) ([]ioc.Indicator, error) { return parseAll(values) }
 
 func parseAll(values []string) ([]ioc.Indicator, error) {
 	out := make([]ioc.Indicator, 0, len(values))
