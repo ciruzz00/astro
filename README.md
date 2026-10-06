@@ -136,7 +136,7 @@ astro case export brutus --format pdf -o brutus     # pdf, md, json, stix, navig
 
 | Format | What it is for |
 |---|---|
-| **PDF** | A report to hand over or print: summary, indicator table, results by source and notes, with the TLP label at the top and bottom of every page. |
+| **PDF** | A report to hand over or print: executive summary with the overall assessment, key findings, indicator table, MITRE ATT&CK, results by source, analyst notes and an appendix on verdicts and TLP, with the TLP label at the top and bottom of every page. |
 | **Markdown** | A readable report for tickets, wikis and write-ups. |
 | **JSON** | All the case data, for automation. |
 | **STIX 2.1** | A bundle for threat intelligence platforms (MISP, OpenCTI…), marked with the official OASIS TLP 2.0 definitions; IDs are stable, so re-imports do not duplicate objects. |
@@ -346,3 +346,7 @@ challenge DFIR come le Sherlock di Hack The Box e TryHackMe.
 ## License
 
 [MIT](LICENSE) © 2026 Gennaro Justin Casale
+
+The web interface and the PDF reports embed the [IBM Plex](https://github.com/IBM/plex)
+Sans and Mono fonts, © IBM Corp., licensed under the
+[SIL Open Font License 1.1](internal/report/fonts/OFL.txt).
