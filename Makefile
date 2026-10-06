@@ -10,7 +10,7 @@ CLI     := $(COMPOSE) run --rm cli
 VERSION ?= dev
 DATE    ?= $(shell date -u +%Y-%m-%d)
 
-.PHONY: help image shell tidy fmt verify vet lint vuln test check build run try serve token cross clean clean-all
+.PHONY: help image shell tidy fmt verify vet lint vuln test check build run try tui serve token cross clean clean-all
 
 help: ## List available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -54,6 +54,9 @@ try: ## Open a shell with astro built and on PATH, to try it out
 	$(CLI) sh -c 'go build -trimpath -o /home/dev/bin/astro ./cmd/astro && \
 		printf "\nastro is ready. Try:\n  astro sync --list\n  astro search CVE-2021-44228 T1059.001\n  astro --help\nType exit to leave.\n\n" && \
 		PATH=/home/dev/bin:$$PATH exec bash'
+
+tui: ## Open the terminal interface (keys from .env)
+	$(CLI) go run ./cmd/astro tui
 
 serve: ## Start the REST API on http://127.0.0.1:8080 (Ctrl-C to stop)
 	$(COMPOSE) up --build api
