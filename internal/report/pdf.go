@@ -186,7 +186,7 @@ func (d *pdfDoc) furniture() {
 			d.hline(margin, pageW-margin, 42, colBorder, 0.6)
 		}
 		d.hline(margin, pageW-margin, pageH-48, colBorder, 0.6)
-		left := "Case " + d.v.Case.Name + " · generated " + d.o.Now.Format("2006-01-02 15:04 UTC")
+		left := d.v.Case.Name + " · " + d.o.Now.Format("2006-01-02 15:04 UTC")
 		d.text(margin, pageH-38, fSans, 7.5, colMuted, d.fit(left, fSans, 7.5, contentW/2-60))
 		d.tlpBadge(pageW/2-d.tlpWidth()/2, pageH-40)
 		page := fmt.Sprintf("Page %d of %d", p, n)
