@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -52,7 +53,11 @@ MAC addresses and threat names across many intelligence sources at once.`,
 			if g.verbose {
 				level = slog.LevelDebug
 			}
-			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+			var out io.Writer = os.Stderr
+			if cmd.Name() == "tui" && !g.verbose {
+				out = io.Discard // log lines would corrupt the full-screen interface
+			}
+			slog.SetDefault(slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{Level: level})))
 		},
 	}
 	root.PersistentFlags().StringVar(&g.dataDir, "data-dir", "", "directory for config, database and datasets (default $ASTRO_DATA_DIR or the user config dir)")
@@ -67,6 +72,7 @@ MAC addresses and threat names across many intelligence sources at once.`,
 		newKeysCmd(g),
 		newCaseCmd(g),
 		newServeCmd(g),
+		newTUICmd(g),
 		newTokenCmd(g),
 		newVersionCmd(),
 	)
