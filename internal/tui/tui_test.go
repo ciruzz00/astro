@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/ciruzz00/astro/internal/api"
 	"github.com/ciruzz00/astro/internal/cases"
@@ -34,12 +36,17 @@ func (f fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Resu
 
 func newModel(t *testing.T) Model {
 	t.Helper()
+	return newModelWith(t, fakeProvider{"online"}, fakeProvider{"local"})
+}
+
+func newModelWith(t *testing.T, providers ...provider.Provider) Model {
+	t.Helper()
 	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "astro.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	eng := engine.New([]provider.Provider{fakeProvider{"online"}, fakeProvider{"local"}})
+	eng := engine.New(providers)
 	m := New(Config{
 		Engine: eng, Cases: cases.New(st, eng), Store: st, Version: "test",
 		Sources: func() []api.Source {
@@ -127,6 +134,39 @@ func TestSearchShowsSanitizedResults(t *testing.T) {
 	m = key(t, m, "j")
 	if m.sel != 1 || !strings.Contains(m.detail.View(), "example.com") {
 		t.Errorf("selection did not move: sel=%d", m.sel)
+	}
+}
+
+// wordyProvider knows nothing but says so at length, like rdap does.
+type wordyProvider struct{}
+
+func (wordyProvider) Name() string           { return "wordy" }
+func (wordyProvider) Supports(ioc.Type) bool { return true }
+func (wordyProvider) Lookup(context.Context, ioc.Indicator) (*provider.Result, error) {
+	return &provider.Result{Summary: strings.Repeat("no registration data for this name ", 12)}, nil
+}
+
+func TestLongLinesKeepTheLayout(t *testing.T) {
+	m := newModelWith(t, fakeProvider{"online"}, wordyProvider{})
+	m = typeText(t, m, "example.com")
+	m = key(t, m, "enter")
+	m = key(t, m, "esc")
+	out := screen(m)
+	if lines := strings.Count(out, "\n") + 1; lines > 40 {
+		t.Errorf("screen has %d lines, the terminal has 40", lines)
+	}
+	// The list and detail panes end on the same line.
+	plain := regexp.MustCompile("\x1b\\[[0-9;]*m").ReplaceAllString(out, "")
+	if !strings.Contains(plain, "╯╰") {
+		t.Errorf("panes have different heights:\n%s", out)
+	}
+	for _, l := range strings.Split(out, "\n") {
+		if w := lipgloss.Width(l); w > 120 {
+			t.Errorf("line is %d columns wide, the terminal has 120", w)
+		}
+	}
+	if !strings.Contains(m.detail.View(), "wordy") {
+		t.Error("detail pane does not show the source")
 	}
 }
 

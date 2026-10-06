@@ -125,7 +125,7 @@ func (m Model) searchView() string {
 		rows = append(rows, listRow(rep.Verdict, rep.Indicator.Value, left-4, i == m.sel, m.focusResults))
 	}
 	list := paneStyle(m.focusResults).Width(left).Height(h - 2).Render(window(rows, m.sel, h-4))
-	detail := sPane.Width(m.width - left - 2).Height(h - 2).Render(m.detail.View())
+	detail := sPane.Width(m.width - left).Height(h - 2).Render(m.detail.View())
 	return lipgloss.JoinVertical(lipgloss.Left, input, lipgloss.JoinHorizontal(lipgloss.Top, list, detail))
 }
 
@@ -184,7 +184,7 @@ func (m Model) caseView() string {
 		rows = []string{sMuted.Render("No indicators: press i to add some.")}
 	}
 	list := sPaneOn.Width(left).Height(h - 2).Render(window(rows, m.itemSel, h-4))
-	detail := sPane.Width(m.width - left - 2).Height(h - 2).Render(m.detail.View())
+	detail := sPane.Width(m.width - left).Height(h - 2).Render(m.detail.View())
 	return lipgloss.JoinVertical(lipgloss.Left, head, stats, "", lipgloss.JoinHorizontal(lipgloss.Top, list, detail))
 }
 

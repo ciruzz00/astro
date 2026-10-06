@@ -420,8 +420,10 @@ const (
 func (m *Model) resize() {
 	m.input.SetWidth(max(20, m.width-6))
 	left := m.leftWidth()
+	// lipgloss sizes include the border; the panes also have one column of
+	// padding on each side.
 	m.detail.SetWidth(max(20, m.width-left-4))
-	m.detail.SetHeight(max(3, m.paneHeight()-2))
+	m.detail.SetHeight(max(3, m.paneHeight()-2-2))
 }
 
 // caseHeadH is the number of lines above the panes of an open case.
@@ -464,6 +466,9 @@ func (m *Model) refreshDetail() {
 	if notes != "" {
 		content += "\n" + notes
 	}
+	// Wrap every line to the pane: a longer line would be wrapped by the
+	// border instead, and the pane would grow past the layout.
+	content = lipgloss.NewStyle().Width(m.detail.Width()).Render(content)
 	m.detail.SetContent(content)
 	m.detail.GotoTop()
 }
