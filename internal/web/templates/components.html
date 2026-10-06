@@ -33,7 +33,7 @@
 
 {{/* A search report. Expects *engine.Report. */}}
 {{define "report"}}
-<article class="card report">
+<article class="card report" data-verdict="{{.Verdict}}">
   <header class="report-head">
     <div class="report-ioc">
       <code class="ioc">{{clean .Indicator.Value}}</code>
@@ -46,15 +46,13 @@
     </div>
   </header>
   {{if not .Results}}<p class="muted">{{t "No enabled source supports this indicator type."}}</p>{{end}}
-  {{range .Results}}
-  <details class="result" {{if or .Found .Error}}open{{end}}>
+  {{range shown .Results}}
+  <details class="result" open>
     <summary>
       <span class="provider">{{.Provider}}</span>
-      {{if .Error}}<span class="badge v-error">{{t "error"}}</span>
-      {{else if .Found}}{{if ge .Verdict.Rank 1}}{{template "verdict" .Verdict}}{{end}}
-      {{else}}<span class="badge v-none">{{t "no data"}}</span>{{end}}
+      <span class="rv">{{if .Error}}<span class="badge v-error">{{t "error"}}</span>{{else if ge .Verdict.Rank 1}}{{template "verdict" .Verdict}}{{end}}</span>
       <span class="summary">{{if .Error}}{{clean .Error}}{{else}}{{clean .Summary}}{{end}}</span>
-      {{if .Cached}}<span class="muted small">{{t "cached"}} {{date .FetchedAt}}</span>{{end}}
+      <span class="meta">{{if .Cached}}{{t "cached"}} {{date .FetchedAt}}{{end}}</span>
     </summary>
     {{if .Fields}}
     <dl class="fields">
@@ -64,5 +62,6 @@
     {{if .Reference}}<p class="ref"><a href="{{.Reference}}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{t "Open in"}} {{.Provider}} ↗</a></p>{{end}}
   </details>
   {{end}}
+  {{with noData .Results}}<p class="nodata"><span>{{t "No data from"}}</span>{{range .}} <span class="src">{{.}}</span>{{end}}</p>{{end}}
 </article>
 {{end}}

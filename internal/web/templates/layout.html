@@ -15,7 +15,7 @@
 <div id="progress" class="progress" aria-hidden="true"><span></span></div>
 {{if .User}}
 <aside class="sidebar">
-  <a class="brand" href="/"><img src="{{asset "favicon.svg"}}" alt="" width="26" height="26"><span>astro</span></a>
+  <a class="brand" href="/"><img src="{{asset "favicon.svg"}}" alt="" width="28" height="28"><span class="brand-text"><strong>astro</strong><small>{{t "Threat intelligence"}}</small></span></a>
   <nav aria-label="{{t "Main"}}">
     <p class="nav-group">{{t "Investigate"}}</p>
     <a href="/" {{if eq .Nav "search"}}class="active" aria-current="page"{{end}}>{{template "icon" "search"}}{{t "Search"}}</a>
@@ -39,6 +39,16 @@
 </aside>
 {{end}}
 <main class="main">
+  {{if .User}}
+  <header class="topbar">
+    <form class="quick" method="get" action="/search" role="search">
+      {{template "icon" "search"}}
+      <input type="search" name="q" placeholder="{{t "Search an indicator: hash, IP, domain, URL, CVE…"}}" aria-label="{{t "Quick search"}}" autocomplete="off" spellcheck="false" data-quick>
+      <kbd>/</kbd>
+    </form>
+    <a class="btn btn-sm" href="/cases">{{template "icon" "cases"}}<span>{{t "Cases"}}</span></a>
+  </header>
+  {{end}}
   <div class="container">
     {{with .Flash}}<div class="flash flash-{{.Kind}}" role="status">{{.Message}}</div>{{end}}
     {{template "content" .}}

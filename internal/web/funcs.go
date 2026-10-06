@@ -70,4 +70,25 @@ var funcs = template.FuncMap{
 		return out
 	},
 	"searchable": func(t ioc.Type) bool { return t != ioc.Keyword },
+	// shown lists the results with data or an error, most severe first.
+	"shown": func(rs []*provider.Result) []*provider.Result {
+		var out []*provider.Result
+		for _, r := range rs {
+			if r.Found || r.Error != "" {
+				out = append(out, r)
+			}
+		}
+		slices.SortStableFunc(out, func(a, b *provider.Result) int { return b.Verdict.Rank() - a.Verdict.Rank() })
+		return out
+	},
+	// noData lists the sources that know nothing about the indicator.
+	"noData": func(rs []*provider.Result) []string {
+		var out []string
+		for _, r := range rs {
+			if !r.Found && r.Error == "" {
+				out = append(out, r.Provider)
+			}
+		}
+		return out
+	},
 }

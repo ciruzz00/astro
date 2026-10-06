@@ -24,6 +24,15 @@
     });
   });
 
+  // "/" focuses the quick search, as in most consoles.
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey) { return; }
+    var t = ev.target;
+    if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) { return; }
+    var q = document.querySelector("[data-quick]");
+    if (q) { ev.preventDefault(); q.focus(); }
+  });
+
   // "Select all" checkboxes: data-check-all="<name of the item checkboxes>".
   document.addEventListener("change", function (ev) {
     var all = ev.target.closest("[data-check-all]");
