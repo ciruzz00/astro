@@ -77,3 +77,19 @@ func TestNoHTTPSDowngrade(t *testing.T) {
 		t.Errorf("https->http redirect must be refused, err = %v", err)
 	}
 }
+
+func TestCallerHeadersOverrideDefaults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"accept":"` + r.Header.Get("Accept") + `","key":"` + r.Header.Get("X-Apikey") + `"}`))
+	}))
+	defer srv.Close()
+	c := NewClient(5 * time.Second)
+	var got struct{ Accept, Key string }
+	if err := GetJSON(context.Background(), c, srv.URL, nil, &got); err != nil || got.Accept != "application/json" {
+		t.Errorf("default Accept = %q, %v", got.Accept, err)
+	}
+	h := http.Header{"Accept": {"application/dns-json"}, "x-apikey": {"k"}}
+	if err := GetJSON(context.Background(), c, srv.URL, h, &got); err != nil || got.Accept != "application/dns-json" || got.Key != "k" {
+		t.Errorf("caller headers = %+v, %v", got, err)
+	}
+}

@@ -133,12 +133,13 @@ func doJSON(ctx context.Context, c *http.Client, method, endpoint string, header
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Accept", "application/json")
 	for k, vals := range header {
+		req.Header.Del(k)
 		for _, val := range vals {
 			req.Header.Add(k, val)
 		}
 	}
-	req.Header.Set("Accept", "application/json")
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
