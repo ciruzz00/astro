@@ -16,14 +16,18 @@ import (
 	"github.com/ciruzz00/astro/internal/provider/abusech"
 	"github.com/ciruzz00/astro/internal/provider/abuseipdb"
 	"github.com/ciruzz00/astro/internal/provider/attack"
+	"github.com/ciruzz00/astro/internal/provider/dns"
 	"github.com/ciruzz00/astro/internal/provider/epss"
 	"github.com/ciruzz00/astro/internal/provider/greynoise"
+	"github.com/ciruzz00/astro/internal/provider/hostinfo"
 	"github.com/ciruzz00/astro/internal/provider/kev"
 	"github.com/ciruzz00/astro/internal/provider/nvd"
 	"github.com/ciruzz00/astro/internal/provider/otx"
 	"github.com/ciruzz00/astro/internal/provider/oui"
+	"github.com/ciruzz00/astro/internal/provider/rdap"
 	"github.com/ciruzz00/astro/internal/provider/shodan"
 	"github.com/ciruzz00/astro/internal/provider/virustotal"
+	"github.com/ciruzz00/astro/internal/provider/wikipedia"
 	"github.com/ciruzz00/astro/internal/render"
 	"github.com/ciruzz00/astro/internal/store"
 )
@@ -138,6 +142,7 @@ func (a *app) allSources(k config.Keys) []source {
 	c := a.client
 	out := []source{
 		{provider: attack.New(a.store), local: true},
+		{provider: wikipedia.New(c, wikipedia.DefaultBase)},
 		{provider: virustotal.New(c, virustotal.DefaultBase, k.VirusTotal), keyEnv: "ASTRO_VIRUSTOTAL_KEY", key: k.VirusTotal, need: keyRequired},
 		{provider: abusech.NewMalwareBazaar(c, abusech.MalwareBazaarBase, k.AbuseCH), keyEnv: "ASTRO_ABUSECH_KEY", key: k.AbuseCH, need: keyRequired},
 		{provider: abusech.NewThreatFox(c, abusech.ThreatFoxBase, k.AbuseCH), keyEnv: "ASTRO_ABUSECH_KEY", key: k.AbuseCH, need: keyRequired},
@@ -146,6 +151,9 @@ func (a *app) allSources(k config.Keys) []source {
 		{provider: otx.New(c, otx.DefaultBase, k.OTX), keyEnv: "ASTRO_OTX_KEY", key: k.OTX, need: keyRequired},
 		{provider: greynoise.New(c, greynoise.DefaultBase, k.GreyNoise), keyEnv: "ASTRO_GREYNOISE_KEY", key: k.GreyNoise, need: keyOptional},
 		{provider: shodan.New(c, shodan.DefaultBase, shodan.DefaultInternetDB, k.Shodan), keyEnv: "ASTRO_SHODAN_KEY", key: k.Shodan, need: keyOptional},
+		{provider: rdap.New(c, rdap.DefaultBase)},
+		{provider: dns.New(c, dns.DefaultBase)},
+		{provider: hostinfo.New(), local: true},
 		{provider: nvd.New(c, nvd.DefaultBase, k.NVD), keyEnv: "ASTRO_NVD_KEY", key: k.NVD, need: keyOptional},
 		{provider: kev.New(a.store), local: true},
 		{provider: epss.New(c, epss.DefaultBase)},
