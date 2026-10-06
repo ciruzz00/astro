@@ -34,12 +34,17 @@ indicator into each, and then writing down the results somewhere.
 astro does that in one step:
 
 - **One query, every source.** Indicators are searched in parallel across
-  13 sources, with per-source timeouts, rate limits and a local cache that keeps
+  17 sources, with per-source timeouts, rate limits and a local cache that keeps
   you within free-tier quotas.
 - **Understands what you paste.** Hashes (MD5, SHA1, SHA256, SHA512), IPv4/IPv6,
   domains, URLs, emails, CVEs, ATT&CK IDs (`T1059.001`, `G0032`, `S0154`…), MAC
   addresses and names (`"Lazarus Group"`) are detected automatically, and
   defanged input like `hxxps://evil[.]com` is accepted.
+- **Knows the infrastructure.** Domains and IPs get registration data (RDAP:
+  age, registrar, network owner, abuse contact), DNS records and reverse DNS,
+  and an offline host analysis that flags look-alike characters (`аpple.com` with a Cyrillic "а"),
+  hosting suffixes and machine-generated names. Threat names and famous CVEs
+  also get their Wikipedia summary.
 - **Works on whole logs.** Paste an alert, an email or a log file and astro
   extracts, refangs and de-duplicates every indicator in it.
 - **Keeps your investigation.** Cases collect indicators, their latest results,
@@ -58,8 +63,8 @@ astro does that in one step:
 flowchart LR
     A["Input<br/>indicator, text, log, alert"] --> B["Detect and refang<br/>hash, IP, domain, URL,<br/>CVE, ATT&CK, MAC, name"]
     B --> C{"Search engine<br/>parallel, cached,<br/>rate limited"}
-    C --> D["Online sources<br/>VirusTotal, abuse.ch, AbuseIPDB,<br/>OTX, GreyNoise, Shodan, NVD, EPSS"]
-    C --> E["Offline datasets<br/>MITRE ATT&CK, CISA KEV,<br/>IEEE MAC registry"]
+    C --> D["Online sources<br/>VirusTotal, abuse.ch, AbuseIPDB,<br/>OTX, GreyNoise, Shodan, NVD, EPSS,<br/>RDAP, DNS, Wikipedia"]
+    C --> E["Offline<br/>MITRE ATT&CK, CISA KEV,<br/>IEEE MAC registry, host analysis"]
     D --> F["Results by source<br/>+ overall verdict"]
     E --> F
     F --> G["Cases<br/>notes, tags, TLP"]
@@ -222,6 +227,7 @@ token and bodies are capped at 1 MB. To expose the server beyond localhost, pass
 | Source | Indicators | API key | Network |
 |---|---|---|---|
 | MITRE ATT&CK | ATT&CK IDs, group/software/campaign names | no | offline |
+| Wikipedia | names, CVE | no | online |
 | VirusTotal | hash, IP, domain, URL | required | online |
 | MalwareBazaar (abuse.ch) | MD5, SHA1, SHA256 | required | online |
 | ThreatFox (abuse.ch) | hash, IP, domain, URL | required | online |
@@ -230,6 +236,9 @@ token and bodies are capped at 1 MB. To expose the server beyond localhost, pass
 | AlienVault OTX | hash, IP, domain, URL, CVE | required | online |
 | GreyNoise Community | IPv4 | optional | online |
 | Shodan (InternetDB without a key) | IP | optional | online |
+| RDAP (registries, via rdap.org) | domain, URL, email, IP | no | online |
+| DNS (DNS-over-HTTPS, Cloudflare) | domain, URL, email (MX), IP (PTR) | no | online |
+| Host analysis | domain, URL, email | no | offline |
 | NVD | CVE | optional | online |
 | CISA KEV | CVE | no | offline |
 | FIRST EPSS | CVE | no | online |
@@ -267,6 +276,12 @@ astro keys unset virustotal
 - **Searches are disclosures.** Online sources receive the indicators you
   search, and some share lookups with their community. Use `--offline` (or
   *Offline only* in the web interface) for internal or sensitive indicators.
+- **DNS and RDAP lookups touch the attacker's side.** DNS queries go through
+  DNS-over-HTTPS (Cloudflare), so they stay out of your local or corporate
+  resolver logs, but the domain's authoritative name servers still see a query
+  coming from Cloudflare. RDAP queries reach the domain's registry. Neither
+  reveals your address, yet a domain watched by its owner can notice the
+  lookup: use `--offline` or `--only` when that matters.
 - Lookups only contact the fixed API endpoints of each source: searched URLs
   and domains are sent as data and never fetched.
 - API keys and tokens are never logged or printed; error messages strip query
@@ -316,9 +331,9 @@ internal/store/     SQLite storage and migrations
 
 astro è un motore di ricerca per la threat intelligence. Incolli un hash, un IP,
 un dominio, un URL, una CVE, un ID MITRE ATT&CK, un MAC address o il nome di una
-minaccia: astro lo riconosce, lo cerca in parallelo su 13 fonti (VirusTotal,
-abuse.ch, AbuseIPDB, OTX, GreyNoise, Shodan, NVD, EPSS e i dataset offline
-MITRE ATT&CK, CISA KEV e registro MAC IEEE) e restituisce un verdetto unico.
+minaccia: astro lo riconosce, lo cerca in parallelo su 17 fonti (VirusTotal,
+abuse.ch, AbuseIPDB, OTX, GreyNoise, Shodan, NVD, EPSS, RDAP, DNS, Wikipedia
+e, offline, MITRE ATT&CK, CISA KEV, registro MAC IEEE e analisi dell'host) e restituisce un verdetto unico.
 
 Si usa da riga di comando, da un'interfaccia a schermo intero nel terminale
 (`astro tui`), dal browser (interfaccia in italiano e inglese, con guida

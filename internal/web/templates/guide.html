@@ -84,6 +84,7 @@
 
 <h2 id="sources">Fonti e dataset</h2>
 <p><strong>Fonti</strong> elenca le fonti e il loro stato. Le fonti <em>online</em> ricevono l'indicatore cercato; quelle <em>offline</em> leggono i dataset locali. Sincronizza i dataset (MITRE ATT&amp;CK, CISA KEV, registro MAC) al primo avvio e poi periodicamente: la dashboard avvisa se hanno più di 30 giorni.</p>
+<p>Alcune fonti non richiedono chiavi: <strong>rdap</strong> (data di registrazione, registrar, proprietario della rete e contatto abuse; un dominio registrato da meno di 30 giorni è sospetto), <strong>dns</strong> (record A, AAAA, CNAME, MX, NS, TXT e DNS inverso), <strong>hostinfo</strong> (analisi offline: dominio registrabile, suffissi di hosting, caratteri ingannevoli come <code>аpple.com</code> con una "а" cirillica, nomi generati da algoritmi) e <strong>wikipedia</strong> (riassunto per gruppi, malware e CVE famose).</p>
 
 <h2 id="keys">Chiavi API</h2>
 <p>In <strong>Chiavi API</strong> inserisci le chiavi delle piattaforme (VirusTotal, abuse.ch, AbuseIPDB, OTX, Shodan, GreyNoise, NVD). Le fonti si attivano subito, senza riavviare. "Test" esegue una ricerca innocua (file di test EICAR, 8.8.8.8, CVE-2021-44228…) per verificare la chiave. Le chiavi non vengono più mostrate dopo il salvataggio. Se una chiave è impostata da variabile d'ambiente ha la precedenza e qui risulta bloccata.</p>
@@ -95,6 +96,7 @@
 <h2 id="opsec">Sicurezza e OPSEC</h2>
 <ul>
   <li>Le fonti online (VirusTotal in particolare) possono condividere le ricerche: per indicatori sensibili o interni usa <strong>Solo offline</strong>.</li>
+  <li>Le ricerche DNS passano da DNS-over-HTTPS (Cloudflare) e non compaiono nei log del DNS locale o aziendale, ma i name server del dominio vedono comunque una richiesta; RDAP interroga il registro del dominio. Se il dominio è controllato dall'attaccante, usa <strong>Solo offline</strong> o escludi queste fonti.</li>
   <li>Il server ascolta solo su localhost salvo configurazione esplicita; per esporlo usa TLS.</li>
   <li>I dati delle fonti sono trattati come non fidati e mostrati in modo sicuro.</li>
 </ul>
@@ -190,6 +192,7 @@
 
 <h2 id="sources">Sources and datasets</h2>
 <p><strong>Sources</strong> lists the sources and their status. <em>Online</em> sources receive the searched indicator; <em>offline</em> ones read local datasets. Sync the datasets (MITRE ATT&amp;CK, CISA KEV, MAC registry) on first use and then regularly: the dashboard warns when they are older than 30 days.</p>
+<p>Some sources need no key: <strong>rdap</strong> (registration date, registrar, network owner and abuse contact; a domain registered less than 30 days ago is suspicious), <strong>dns</strong> (A, AAAA, CNAME, MX, NS, TXT records and reverse DNS), <strong>hostinfo</strong> (offline analysis: registrable domain, hosting suffixes, look-alike characters such as <code>аpple.com</code> with a Cyrillic "а", algorithmically generated names) and <strong>wikipedia</strong> (summary for groups, malware and famous CVEs).</p>
 
 <h2 id="keys">API keys</h2>
 <p>In <strong>API keys</strong> you enter the keys of the platforms (VirusTotal, abuse.ch, AbuseIPDB, OTX, Shodan, GreyNoise, NVD). Sources are enabled immediately, without a restart. "Test" runs a harmless lookup (the EICAR test file, 8.8.8.8, CVE-2021-44228…) to check the key. Keys are never shown again once saved. A key set by an environment variable takes precedence and is locked here.</p>
@@ -201,6 +204,7 @@
 <h2 id="opsec">Security and OPSEC</h2>
 <ul>
   <li>Online sources (VirusTotal in particular) may share searches: use <strong>Offline only</strong> for sensitive or internal indicators.</li>
+  <li>DNS lookups use DNS-over-HTTPS (Cloudflare) and stay out of local or corporate resolver logs, but the domain's name servers still see a query; RDAP asks the domain's registry. If the attacker controls the domain, use <strong>Offline only</strong> or leave these sources out.</li>
   <li>The server listens on localhost unless configured otherwise; use TLS to expose it.</li>
   <li>Source data is treated as untrusted and always displayed safely.</li>
 </ul>
