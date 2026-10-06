@@ -16,6 +16,7 @@ DFIR challenges such as Hack The Box Sherlocks or TryHackMe rooms.
 - [Quick start](#quick-start)
 - [Command line](#command-line)
 - [Cases and reports](#cases-and-reports)
+- [Terminal interface](#terminal-interface)
 - [Web interface](#web-interface)
 - [REST API](#rest-api)
 - [Sources and API keys](#sources-and-api-keys)
@@ -44,9 +45,9 @@ astro does that in one step:
 - **Keeps your investigation.** Cases collect indicators, their latest results,
   notes and tags under a TLP marking, and export to PDF, Markdown, JSON,
   STIX 2.1 or an ATT&CK Navigator layer.
-- **Fits your workflow.** Use it from the command line, from the browser
-  (English or Italian), or from other tools through the REST API, for example
-  to enrich EDR/SOAR alerts.
+- **Fits your workflow.** Use it from the command line, from a full-screen
+  terminal interface, from the browser (English or Italian), or from other
+  tools through the REST API, for example to enrich EDR/SOAR alerts.
 - **Works offline too.** MITRE ATT&CK, the CISA Known Exploited Vulnerabilities
   catalog and the IEEE MAC registry are stored locally, so sensitive indicators
   can be checked without anything leaving your machine.
@@ -138,6 +139,27 @@ astro case export brutus --format pdf -o brutus     # pdf, md, json, stix, navig
 
 PDF and Markdown reports defang indicators (notes included) and escape all
 provider data, so they are safe to share and render.
+
+## Terminal interface
+
+```sh
+astro tui
+```
+
+A keyboard-driven, full-screen interface for working over SSH or without a
+browser:
+
+- **Search**: type or paste indicators (several at once, defanged, or whole log
+  lines), browse the results and scroll through each source's details;
+  `ctrl+s` saves every result into a case.
+- **Cases**: open a case to search new indicators (`s`) or all again (`S`), add
+  indicators (`i`) and notes (`m`), export a report (`e`) or close it (`c`);
+  `n` creates a case.
+- **Sources**: enabled sources and offline datasets; `u` syncs the datasets.
+- `ctrl+o` switches to offline mode, `?` shows every key.
+
+Provider data is stripped of control characters before it reaches the screen,
+so a malicious answer cannot inject terminal escape sequences.
 
 ## Web interface
 
@@ -270,6 +292,7 @@ on the host.
 make try      # shell with astro built and on the PATH (keys from .env)
 make test     # go test -race
 make check    # verify, vet, staticcheck, gosec, govulncheck and tests (same as CI)
+make tui      # terminal interface
 make serve    # web interface and API on http://127.0.0.1:8080
 make cross    # release archives for every OS and architecture in dist/
 make help     # every target
@@ -285,6 +308,7 @@ internal/cases/     investigations
 internal/report/    PDF, Markdown, JSON, STIX 2.1 and Navigator exports
 internal/api/       REST API and OpenAPI spec
 internal/web/       web interface (templates, translations, static files)
+internal/tui/       terminal interface
 internal/store/     SQLite storage and migrations
 ```
 
@@ -296,8 +320,9 @@ minaccia: astro lo riconosce, lo cerca in parallelo su 13 fonti (VirusTotal,
 abuse.ch, AbuseIPDB, OTX, GreyNoise, Shodan, NVD, EPSS e i dataset offline
 MITRE ATT&CK, CISA KEV e registro MAC IEEE) e restituisce un verdetto unico.
 
-Si usa da riga di comando, dal browser (interfaccia in italiano e inglese, con
-guida integrata) o tramite REST API, ad esempio per arricchire gli alert di un
+Si usa da riga di comando, da un'interfaccia a schermo intero nel terminale
+(`astro tui`), dal browser (interfaccia in italiano e inglese, con guida
+integrata) o tramite REST API, ad esempio per arricchire gli alert di un
 EDR o di un SOAR. I **casi** raccolgono indicatori, risultati, note e tag con
 una marcatura TLP e si esportano in PDF, Markdown, JSON, STIX 2.1 o come layer
 di ATT&CK Navigator. È pensato per incident response, SOC, threat hunting e
