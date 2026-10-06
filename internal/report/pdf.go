@@ -334,6 +334,8 @@ func (d *pdfDoc) result(r *provider.Result) {
 	default:
 		status, c = r.Summary, colText
 	}
+	// Summaries can name hosts and addresses (DNS, RDAP): defang them too.
+	status = ioc.DefangText(status)
 	_ = d.gp.SetFont("regular", "", 9)
 	lines := d.wrap(status, contentW-150, false)
 	d.ensure(12 * float64(len(lines)+1))

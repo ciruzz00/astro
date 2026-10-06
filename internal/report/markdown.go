@@ -54,15 +54,16 @@ func Markdown(w io.Writer, v *cases.View, o Options) error {
 			for _, r := range it.Report.Results {
 				switch {
 				case r.Error != "":
-					fmt.Fprintf(b, "- **%s**: error: %s\n", md(r.Provider), md(r.Error))
+					fmt.Fprintf(b, "- **%s**: error: %s\n", md(r.Provider), md(ioc.DefangText(r.Error)))
 				case !r.Found:
-					fmt.Fprintf(b, "- **%s**: %s\n", md(r.Provider), md(orDefault(r.Summary, "no data")))
+					fmt.Fprintf(b, "- **%s**: %s\n", md(r.Provider), md(ioc.DefangText(orDefault(r.Summary, "no data"))))
 				default:
 					verdict := ""
 					if r.Verdict.Rank() > 0 {
 						verdict = " (" + strings.ToUpper(string(r.Verdict)) + ")"
 					}
-					fmt.Fprintf(b, "- **%s**%s: %s\n", md(r.Provider), verdict, md(r.Summary))
+					// Summaries can name hosts and addresses (DNS, RDAP).
+					fmt.Fprintf(b, "- **%s**%s: %s\n", md(r.Provider), verdict, md(ioc.DefangText(r.Summary)))
 				}
 			}
 		}

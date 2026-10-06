@@ -40,6 +40,7 @@ func view() *cases.View {
 					{Provider: "virustotal", Found: true, Verdict: provider.VerdictMalicious, Summary: "9/90 [click](javascript:alert(1))"},
 					{Provider: "alienvault-otx", Found: true, Verdict: provider.VerdictSuspicious, Summary: "1 pulse", Details: otxDetails},
 					{Provider: "abuseipdb", Error: "rate limit"},
+					{Provider: "dns", Found: true, Verdict: provider.VerdictInfo, Summary: "reverse DNS: c2.example.net"},
 				}},
 			},
 			{Indicator: ioc.Indicator{Type: ioc.URL, Value: "https://evil.example.com/a'b"}, AddedAt: created},
@@ -61,7 +62,7 @@ func TestMarkdownIsSafe(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := b.String()
-	for _, bad := range []string{"<script>", "<img", "198.51.100.7", "https://evil"} {
+	for _, bad := range []string{"<script>", "<img", "198.51.100.7", "https://evil", "c2.example.net"} {
 		if strings.Contains(out, bad) {
 			t.Errorf("markdown contains %q:\n%s", bad, out)
 		}
