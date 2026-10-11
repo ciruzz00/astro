@@ -10,7 +10,7 @@ CLI     := $(COMPOSE) run --rm cli
 VERSION ?= dev
 DATE    ?= $(shell date -u +%Y-%m-%d)
 
-.PHONY: help image shell tidy fmt verify vet lint vuln test check build run try tui serve token cross clean clean-all
+.PHONY: help image shell tidy fmt fmt-check verify vet lint vuln test check build run try tui serve token cross clean clean-all
 
 help: ## List available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -27,6 +27,9 @@ tidy: ## Run go mod tidy
 fmt: ## Format the code
 	$(RUN) gofmt -s -w .
 
+fmt-check: ## Fail if any file is not gofmt-formatted (as in CI)
+	$(RUN) sh -c 'test -z "$$(gofmt -s -l .)" || { gofmt -s -l .; exit 1; }'
+
 verify: ## Verify module checksums
 	$(RUN) go mod verify
 
@@ -42,7 +45,7 @@ vuln: ## Scan dependencies for known vulnerabilities
 test: ## Run tests with the race detector
 	$(RUN) go test -race ./...
 
-check: verify vet lint vuln test ## Run every check (same as CI)
+check: verify fmt-check vet lint vuln test ## Run every check (same as CI)
 
 build: ## Build a linux binary for the container into dist/
 	$(RUN) go build -trimpath -o dist/astro ./cmd/astro
