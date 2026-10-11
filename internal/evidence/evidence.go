@@ -268,7 +268,7 @@ func (im *Importer) parse(ctx context.Context, p logs.Parser, f *os.File, compre
 	}
 
 	source := strings.TrimSuffix(filepath.Base(f.Name()), ".gz")
-	popts := logs.Options{Year: opts.Year, Location: opts.Location, Host: opts.Host, Source: source,
+	popts := logs.Options{Year: opts.Year, Location: opts.Location, Host: opts.Host, Source: source, Path: f.Name(),
 		ModTime: info.ModTime(), MaxEvents: im.MaxEvents}
 	ref := logs.EvidenceRef{EvidenceID: evidenceID, Path: f.Name(), SHA256: sums.sha256}
 	host := opts.Host
