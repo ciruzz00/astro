@@ -10,7 +10,7 @@ RUN apt-get update \
 
 RUN GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
     && GOBIN=/usr/local/bin go install honnef.co/go/tools/cmd/staticcheck@v0.7.0-0.dev.0.20261009230814-452d5bb86b45 \
-    && GOBIN=/usr/local/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0 \
+    && GOBIN=/usr/local/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.29.1-0.20261005092323-d2b649ec0182 \
     && rm -rf /root/go /root/.cache
 
 RUN groupadd -o -g "${GID}" dev \
