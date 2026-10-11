@@ -1,5 +1,5 @@
 # Development image: Go toolchain plus pinned static analysis tools.
-FROM golang:1.27-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195
+FROM golang:1.27-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
 
 ARG UID=1000
 ARG GID=1000
@@ -9,7 +9,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN GOBIN=/usr/local/bin go install golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
-    && GOBIN=/usr/local/bin go install honnef.co/go/tools/cmd/staticcheck@v0.8.1 \
+    && GOBIN=/usr/local/bin go install honnef.co/go/tools/cmd/staticcheck@v0.7.0-0.dev.0.20261009230814-452d5bb86b45 \
     && GOBIN=/usr/local/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0 \
     && rm -rf /root/go /root/.cache
 

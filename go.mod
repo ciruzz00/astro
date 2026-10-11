@@ -1,6 +1,6 @@
 module github.com/ciruzz00/astro
 
-go 1.27.1
+go 1.27.2
 
 require (
 	charm.land/bubbles/v2 v2.2.1
@@ -10,7 +10,7 @@ require (
 	github.com/signintech/gopdf v0.38.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/image v0.46.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.16.0
 	modernc.org/sqlite v1.60.1
