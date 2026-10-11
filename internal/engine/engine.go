@@ -77,9 +77,9 @@ type Report struct {
 	// Notice explains why sources were skipped (e.g. an internal address).
 	Notice string `json:"notice,omitempty"`
 	// Skipped lists the online sources that were not queried.
-	Skipped []string `json:"skipped,omitempty"`
-	Started   time.Time          `json:"started"`
-	Duration  time.Duration      `json:"duration_ns"`
+	Skipped  []string      `json:"skipped,omitempty"`
+	Started  time.Time     `json:"started"`
+	Duration time.Duration `json:"duration_ns"`
 }
 
 // SearchOptions tunes a single search.
