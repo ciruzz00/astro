@@ -114,6 +114,9 @@ type Options struct {
 	Host string
 	// Source names the file in events (its base name).
 	Source string
+	// Path is the full path of the evidence (e.g. to tell whose shell
+	// history it is).
+	Path string
 	// ModTime is the file modification time, used to infer syslog years.
 	ModTime time.Time
 	// MaxEvents stops the parser after this many events; 0 means no limit.

@@ -20,10 +20,12 @@ const (
 	KindSyslog      Kind = "syslog"
 	KindBashHistory Kind = "bash-history"
 	KindZshHistory  Kind = "zsh-history"
+	KindAccess      Kind = "access-log"  // web server access log (Common/Combined)
+	KindDocker      Kind = "docker-json" // Docker json-file container log
 )
 
 // Kinds lists the known formats.
-var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory}
+var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker}
 
 // HeadSize is how many leading bytes Detect needs.
 const HeadSize = 4096
@@ -40,6 +42,8 @@ var (
 	// modern rsyslog and journald exports.
 	reSyslog = regexp.MustCompile(`^(?:<\d{1,3}>1 \d{4}-\d\d-\d\dT|[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d \S+ |\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:?\d\d) \S+ )`)
 	reZsh    = regexp.MustCompile(`(?m)^: \d{9,11}:\d+;`)
+	reAccess = regexp.MustCompile(`^\S+ \S+ \S+ \[\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\] "`)
+	reDocker = regexp.MustCompile(`^\{"log":".*","stream":"\w+","time":"\d{4}-`)
 )
 
 // IsGzip reports whether head starts a gzip stream (rotated logs: auth.log.2.gz).
@@ -66,6 +70,9 @@ func Detect(name string, head []byte) Kind {
 			return KindWtmp
 		}
 	}
+	// Runs of NUL bytes appear in text logs truncated while being written
+	// (log wiping) or after a crash: judge the text around them.
+	head = bytes.ReplaceAll(head, []byte{0}, nil)
 	if !isText(head) {
 		return KindUnknown
 	}
@@ -75,8 +82,14 @@ func Detect(name string, head []byte) Kind {
 		}
 		return KindBashHistory
 	}
-	if reSyslog.Match(firstLine(head)) {
+	first := firstLine(head)
+	switch {
+	case reSyslog.Match(first):
 		return KindSyslog
+	case reDocker.Match(first):
+		return KindDocker
+	case reAccess.Match(first):
+		return KindAccess
 	}
 	return KindUnknown
 }
@@ -111,9 +124,9 @@ func printableField(b []byte) bool {
 	return true
 }
 
-// isText rejects binary data: NUL bytes or many control characters.
+// isText rejects binary data: many control characters.
 func isText(b []byte) bool {
-	if len(b) == 0 || bytes.IndexByte(b, 0) >= 0 {
+	if len(b) == 0 {
 		return false
 	}
 	ctrl := 0
