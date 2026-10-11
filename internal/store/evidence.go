@@ -163,6 +163,9 @@ func (s *Store) VerifyCustody(ctx context.Context, evidenceID int64) error {
 	return nil
 }
 
+// maxCommandLine bounds the command line stored for an event.
+const maxCommandLine = 64 << 10
+
 // InsertEvents stores a batch of parsed events in one transaction.
 func (s *Store) InsertEvents(ctx context.Context, caseID, evidenceID int64, evs []*logs.Event) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
@@ -186,7 +189,8 @@ func (s *Store) InsertEvents(ctx context.Context, caseID, evidenceID int64, evs 
 			}
 			if _, err := st.ExecContext(ctx, caseID, evidenceID, e.Time.UnixNano(), e.Seq, e.YearGuessed, e.TimeUnknown,
 				e.Host, e.Source, e.Kind, e.EventID, e.Channel, e.Provider, e.User, e.SrcIP, e.DstIP,
-				e.Process, e.Parent, e.CommandLine, e.Message, fields, logs.Truncate(e.Raw, logs.MaxRaw),
+				e.Process, e.Parent, logs.Truncate(e.CommandLine, maxCommandLine), logs.Truncate(e.Message, logs.MaxRaw),
+				fields, logs.Truncate(e.Raw, logs.MaxRaw),
 				int(e.Severity), e.Ref.Record); err != nil {
 				return err
 			}
