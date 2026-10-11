@@ -95,7 +95,8 @@
 
 <h2 id="opsec">Sicurezza e OPSEC</h2>
 <ul>
-  <li>Le fonti online (VirusTotal in particolare) possono condividere le ricerche: per indicatori sensibili o interni usa <strong>Solo offline</strong>.</li>
+  <li>Le fonti online (VirusTotal in particolare) possono condividere le ricerche: per indicatori sensibili usa <strong>Solo offline</strong>.</li>
+  <li>Gli indirizzi interni (privati, loopback, link-local, CGNAT 100.64.0.0/10, documentali e altri intervalli riservati IPv4/IPv6, gli URL e le email che puntano a loro e i nomi sotto <code>home.arpa</code>) non vengono <strong>mai</strong> inviati alle fonti online, anche senza <em>Solo offline</em>: il risultato lo indica.</li>
   <li>Le ricerche DNS passano da DNS-over-HTTPS (Cloudflare) e non compaiono nei log del DNS locale o aziendale, ma i name server del dominio vedono comunque una richiesta; RDAP interroga il registro del dominio. Se il dominio è controllato dall'attaccante, usa <strong>Solo offline</strong> o escludi queste fonti.</li>
   <li>Il server ascolta solo su localhost salvo configurazione esplicita; per esporlo usa TLS.</li>
   <li>I dati delle fonti sono trattati come non fidati e mostrati in modo sicuro.</li>
@@ -203,7 +204,8 @@
 
 <h2 id="opsec">Security and OPSEC</h2>
 <ul>
-  <li>Online sources (VirusTotal in particular) may share searches: use <strong>Offline only</strong> for sensitive or internal indicators.</li>
+  <li>Online sources (VirusTotal in particular) may share searches: use <strong>Offline only</strong> for sensitive indicators.</li>
+  <li>Internal addresses (private, loopback, link-local, CGNAT 100.64.0.0/10, documentation and other reserved IPv4/IPv6 ranges, URLs and emails that point to them, and names under <code>home.arpa</code>) are <strong>never</strong> sent to online sources, even without <em>Offline only</em>: the result says so.</li>
   <li>DNS lookups use DNS-over-HTTPS (Cloudflare) and stay out of local or corporate resolver logs, but the domain's name servers still see a query; RDAP asks the domain's registry. If the attacker controls the domain, use <strong>Offline only</strong> or leave these sources out.</li>
   <li>The server listens on localhost unless configured otherwise; use TLS to expose it.</li>
   <li>Source data is treated as untrusted and always displayed safely.</li>

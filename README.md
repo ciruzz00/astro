@@ -112,7 +112,7 @@ astro search CVE-2021-44228 T1059.001 "Lazarus Group"   # several indicators
 astro search "hxxps://evil[.]example[.]com"             # defanged input
 astro search 00:50:56:aa:bb:cc                          # MAC vendor, VM detection
 astro search --file incident.log                        # every IOC in a file
-astro search --offline 10.0.0.5                         # nothing leaves this machine
+astro search --offline evil.example.com                 # nothing leaves this machine
 astro search --only virustotal,malwarebazaar <hash>     # chosen sources only
 astro search --json 8.8.8.8 | jq .                      # JSON for scripts
 astro extract --defang report.txt                       # extract IOCs without searching
@@ -275,7 +275,14 @@ astro keys unset virustotal
 
 - **Searches are disclosures.** Online sources receive the indicators you
   search, and some share lookups with their community. Use `--offline` (or
-  *Offline only* in the web interface) for internal or sensitive indicators.
+  *Offline only* in the web interface) for sensitive indicators.
+- **Internal addresses never leave the machine.** Private, loopback,
+  link-local, multicast, carrier-grade NAT (100.64.0.0/10), documentation and
+  other reserved IPv4/IPv6 ranges, URLs and emails that point to them, and
+  names under `home.arpa` only reach the offline sources, in every interface,
+  even without `--offline`. The result says "internal address: not sent to
+  online sources". Searching `10.0.0.5` would only tell VirusTotal & co. how
+  the network under analysis is laid out.
 - **DNS and RDAP lookups touch the attacker's side.** DNS queries go through
   DNS-over-HTTPS (Cloudflare), so they stay out of your local or corporate
   resolver logs, but the domain's authoritative name servers still see a query
@@ -342,6 +349,9 @@ EDR o di un SOAR. I **casi** raccolgono indicatori, risultati, note e tag con
 una marcatura TLP e si esportano in PDF, Markdown, JSON, STIX 2.1 o come layer
 di ATT&CK Navigator. È pensato per incident response, SOC, threat hunting e
 challenge DFIR come le Sherlock di Hack The Box e TryHackMe.
+
+Gli indirizzi interni (IP privati, loopback, link-local, CGNAT, documentali e
+riservati) non vengono mai inviati alle fonti online: restano sul tuo computer.
 
 ## License
 
