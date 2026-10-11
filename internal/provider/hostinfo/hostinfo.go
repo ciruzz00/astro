@@ -33,6 +33,9 @@ func New() *Provider { return &Provider{} }
 
 func (p *Provider) Name() string { return name }
 
+// Offline reports that the provider only reads local data.
+func (p *Provider) Offline() bool { return true }
+
 func (p *Provider) Supports(t ioc.Type) bool {
 	return t == ioc.Domain || t == ioc.URL || t == ioc.Email
 }

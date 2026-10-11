@@ -128,3 +128,35 @@ func TestSetProviders(t *testing.T) {
 		t.Errorf("results = %+v", rep.Results)
 	}
 }
+
+type offlineFake struct{ *fake }
+
+func (offlineFake) Offline() bool { return true }
+
+func TestInternalIndicatorsStayOffline(t *testing.T) {
+	online := &fake{name: "online", types: []ioc.Type{ioc.IPv4, ioc.URL}, verdict: provider.VerdictClean}
+	local := offlineFake{&fake{name: "local", types: []ioc.Type{ioc.IPv4}, verdict: provider.VerdictInfo}}
+	e := New([]provider.Provider{online, local})
+
+	for _, s := range []string{"10.0.0.5", "http://192.168.1.10/admin"} {
+		ind, err := ioc.Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rep := e.Search(context.Background(), ind, SearchOptions{Only: []string{"online", "local"}})
+		if rep.Notice != NoticeInternal || len(rep.Skipped) != 1 || rep.Skipped[0] != "online" {
+			t.Errorf("%s: notice %q, skipped %v", s, rep.Notice, rep.Skipped)
+		}
+	}
+	if n := online.calls.Load(); n != 0 {
+		t.Fatalf("online provider called %d times for internal indicators", n)
+	}
+	if n := local.calls.Load(); n != 1 {
+		t.Errorf("offline provider called %d times, want 1", n)
+	}
+
+	rep := e.Search(context.Background(), ioc.Indicator{Type: ioc.IPv4, Value: "8.8.8.8"}, SearchOptions{})
+	if rep.Notice != "" || len(rep.Skipped) != 0 || online.calls.Load() != 1 {
+		t.Errorf("public address: notice %q, skipped %v, online calls %d", rep.Notice, rep.Skipped, online.calls.Load())
+	}
+}

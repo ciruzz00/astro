@@ -23,6 +23,9 @@ func New(s *store.Store) *Provider { return &Provider{store: s} }
 
 func (p *Provider) Name() string { return name }
 
+// Offline reports that the provider only reads local data.
+func (p *Provider) Offline() bool { return true }
+
 func (p *Provider) Supports(t ioc.Type) bool { return t == ioc.CVE }
 
 func (p *Provider) Lookup(ctx context.Context, i ioc.Indicator) (*provider.Result, error) {

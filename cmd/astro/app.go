@@ -63,11 +63,13 @@ type source struct {
 	keyEnv   string
 	key      config.Secret
 	need     keyNeed
-	// local sources read offline datasets and never send indicators out.
-	local bool
 }
 
 func (s source) enabled() bool { return s.need != keyRequired || s.key.IsSet() }
+
+// local reports whether the source reads offline data and never sends
+// indicators out.
+func (s source) local() bool { return provider.IsOffline(s.provider) }
 
 func openApp(ctx context.Context, g *globalFlags) (*app, error) {
 	dir := g.dataDir
@@ -141,7 +143,7 @@ func (a *app) currentSources() []source {
 func (a *app) allSources(k config.Keys) []source {
 	c := a.client
 	out := []source{
-		{provider: attack.New(a.store), local: true},
+		{provider: attack.New(a.store)},
 		{provider: wikipedia.New(c, wikipedia.DefaultBase)},
 		{provider: virustotal.New(c, virustotal.DefaultBase, k.VirusTotal), keyEnv: "ASTRO_VIRUSTOTAL_KEY", key: k.VirusTotal, need: keyRequired},
 		{provider: abusech.NewMalwareBazaar(c, abusech.MalwareBazaarBase, k.AbuseCH), keyEnv: "ASTRO_ABUSECH_KEY", key: k.AbuseCH, need: keyRequired},
@@ -153,11 +155,11 @@ func (a *app) allSources(k config.Keys) []source {
 		{provider: shodan.New(c, shodan.DefaultBase, shodan.DefaultInternetDB, k.Shodan), keyEnv: "ASTRO_SHODAN_KEY", key: k.Shodan, need: keyOptional},
 		{provider: rdap.New(c, rdap.DefaultBase)},
 		{provider: dns.New(c, dns.DefaultBase)},
-		{provider: hostinfo.New(), local: true},
+		{provider: hostinfo.New()},
 		{provider: nvd.New(c, nvd.DefaultBase, k.NVD), keyEnv: "ASTRO_NVD_KEY", key: k.NVD, need: keyOptional},
-		{provider: kev.New(a.store), local: true},
+		{provider: kev.New(a.store)},
 		{provider: epss.New(c, epss.DefaultBase)},
-		{provider: oui.New(a.store), local: true},
+		{provider: oui.New(a.store)},
 	}
 	// Record which configurable key each source uses.
 	for i := range out {
@@ -174,7 +176,7 @@ func (a *app) allSources(k config.Keys) []source {
 func (a *app) localNames() []string {
 	var out []string
 	for _, s := range a.currentSources() {
-		if s.local {
+		if s.local() {
 			out = append(out, s.provider.Name())
 		}
 	}

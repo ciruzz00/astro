@@ -74,6 +74,10 @@ type Report struct {
 	Indicator ioc.Indicator      `json:"indicator"`
 	Verdict   provider.Verdict   `json:"verdict,omitempty"`
 	Results   []*provider.Result `json:"results"`
+	// Notice explains why sources were skipped (e.g. an internal address).
+	Notice string `json:"notice,omitempty"`
+	// Skipped lists the online sources that were not queried.
+	Skipped []string `json:"skipped,omitempty"`
 	Started   time.Time          `json:"started"`
 	Duration  time.Duration      `json:"duration_ns"`
 }
@@ -85,14 +89,25 @@ type SearchOptions struct {
 	Only []string
 }
 
-// Search queries every supporting provider concurrently.
+// NoticeInternal is the Report.Notice of an internal indicator.
+const NoticeInternal = "internal address: not sent to online sources"
+
+// Search queries every supporting provider concurrently. Internal
+// indicators (private IPs and the like) only reach offline providers.
 func (e *Engine) Search(ctx context.Context, ind ioc.Indicator, opts SearchOptions) *Report {
 	start := e.now()
+	internal := ind.IsInternal()
 	var selected []provider.Provider
+	var skipped []string
 	for _, p := range e.Providers() {
-		if p.Supports(ind.Type) && (len(opts.Only) == 0 || slices.Contains(opts.Only, p.Name())) {
-			selected = append(selected, p)
+		if !p.Supports(ind.Type) || (len(opts.Only) > 0 && !slices.Contains(opts.Only, p.Name())) {
+			continue
 		}
+		if internal && !provider.IsOffline(p) {
+			skipped = append(skipped, p.Name())
+			continue
+		}
+		selected = append(selected, p)
 	}
 
 	results := make([]*provider.Result, len(selected))
@@ -104,7 +119,10 @@ func (e *Engine) Search(ctx context.Context, ind ioc.Indicator, opts SearchOptio
 	}
 	wg.Wait()
 
-	rep := &Report{Indicator: ind, Results: results, Started: start, Duration: e.now().Sub(start)}
+	rep := &Report{Indicator: ind, Results: results, Skipped: skipped, Started: start, Duration: e.now().Sub(start)}
+	if internal {
+		rep.Notice = NoticeInternal
+	}
 	for _, r := range results {
 		if r.Verdict.Rank() > rep.Verdict.Rank() {
 			rep.Verdict = r.Verdict

@@ -33,7 +33,7 @@ func newProvidersCmd(g *globalFlags) *cobra.Command {
 					status = "enabled (no key: limited)"
 				}
 				where := "online"
-				if s.local {
+				if s.local() {
 					where = "offline"
 				}
 				fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", s.provider.Name(), status, where, supported(s))

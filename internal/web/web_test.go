@@ -26,14 +26,14 @@ import (
 	"github.com/ciruzz00/astro/internal/store"
 )
 
-// fakeProvider flags 198.51.100.7 and returns an XSS payload in its summary.
+// fakeProvider flags 8.8.8.8 and returns an XSS payload in its summary.
 type fakeProvider struct{}
 
 func (fakeProvider) Name() string           { return "fake" }
 func (fakeProvider) Supports(ioc.Type) bool { return true }
 func (fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Result, error) {
 	v := provider.VerdictClean
-	if i.Value == "198.51.100.7" {
+	if i.Value == "8.8.8.8" {
 		v = provider.VerdictMalicious
 	}
 	return &provider.Result{Found: true, Verdict: v, Summary: `<script>alert("xss")</script>`,
@@ -181,7 +181,7 @@ func TestPagesRenderWithSecurityHeaders(t *testing.T) {
 func TestSearchEscapesProviderData(t *testing.T) {
 	e := setup(t)
 	e.login(t)
-	resp, body := e.do(t, "POST", "/search", url.Values{"text": {"198.51.100[.]7\nexample.com"}, "mode": {"list"}})
+	resp, body := e.do(t, "POST", "/search", url.Values{"text": {"8.8.8[.]8\nexample.com"}, "mode": {"list"}})
 	if resp.StatusCode != 200 {
 		t.Fatalf("search: %d", resp.StatusCode)
 	}
@@ -190,7 +190,7 @@ func TestSearchEscapesProviderData(t *testing.T) {
 			t.Errorf("unescaped provider data %q in page", bad)
 		}
 	}
-	if !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, "v-malicious") || !strings.Contains(body, "198[.]51[.]100[.]7") {
+	if !strings.Contains(body, "&lt;script&gt;") || !strings.Contains(body, "v-malicious") || !strings.Contains(body, "8[.]8[.]8[.]8") {
 		t.Error("results missing escaped summary, verdict or defanged copy value")
 	}
 
@@ -207,7 +207,7 @@ func TestSearchEscapesProviderData(t *testing.T) {
 func TestExtract(t *testing.T) {
 	e := setup(t)
 	e.login(t)
-	_, body := e.do(t, "POST", "/extract", url.Values{"text": {"beacon hxxps://evil[.]example[.]com from 198.51.100.7, CVE-2021-44228"}})
+	_, body := e.do(t, "POST", "/extract", url.Values{"text": {"beacon hxxps://evil[.]example[.]com from 8.8.8.8, CVE-2021-44228"}})
 	if !strings.Contains(body, "3 indicators found") || !strings.Contains(body, `value="https://evil.example.com"`) {
 		t.Errorf("extract page:\n%s", body)
 	}
@@ -222,7 +222,7 @@ func TestCaseWorkflow(t *testing.T) {
 		expect string
 	}{
 		{"/cases", url.Values{"name": {"inc-1"}, "title": {"Phishing <wave>"}, "tlp": {"RED"}, "tags": {"soc, phishing"}}, "Case created."},
-		{"/cases/inc-1/indicators", url.Values{"text": {"mail from 198.51.100.7 to example.com"}, "mode": {"text"}, "note": {"from mail"}, "search": {"on"}}, "2 new indicators added (2 given). 2 searched."},
+		{"/cases/inc-1/indicators", url.Values{"text": {"mail from 8.8.8.8 to example.com"}, "mode": {"text"}, "note": {"from mail"}, "search": {"on"}}, "2 new indicators added (2 given). 2 searched."},
 		{"/cases/inc-1/notes", url.Values{"body": {"User clicked the link"}}, "Note added."},
 		{"/cases/inc-1/tags", url.Values{"add": {"urgent"}}, "Tags added."},
 		{"/cases/inc-1/tags", url.Values{"remove": {"soc"}}, "Tag removed."},
@@ -414,7 +414,7 @@ func TestPDFExportFromWeb(t *testing.T) {
 	e := setup(t)
 	e.login(t)
 	e.do(t, "POST", "/cases", url.Values{"name": {"pdf-case"}})
-	e.do(t, "POST", "/cases/pdf-case/indicators", url.Values{"text": {"198.51.100.7"}, "search": {"on"}})
+	e.do(t, "POST", "/cases/pdf-case/indicators", url.Values{"text": {"8.8.8.8"}, "search": {"on"}})
 	resp, body := e.do(t, "GET", "/cases/pdf-case/export?format=pdf", nil)
 	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "application/pdf" || !strings.HasPrefix(body, "%PDF-") {
 		t.Errorf("pdf export: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))

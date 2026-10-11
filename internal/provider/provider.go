@@ -86,6 +86,18 @@ type Cacheable interface {
 	CacheTTL() time.Duration
 }
 
+// Offline is implemented by providers that only read local data, so the
+// indicators they look up never leave the machine.
+type Offline interface {
+	Offline() bool
+}
+
+// IsOffline reports whether p only reads local data.
+func IsOffline(p Provider) bool {
+	o, ok := p.(Offline)
+	return ok && o.Offline()
+}
+
 // NotFound returns an empty result for provider name.
 func NotFound(name, summary string) *Result {
 	return &Result{Provider: name, Summary: summary}

@@ -21,6 +21,7 @@ var italian = map[string]string{ // #nosec G101 -- interface translations, not c
 
 	// home and search
 	"Hashes, IPs, domains, URLs, emails, CVEs, ATT&CK IDs, MAC addresses or threat names. Defanged input is accepted.": "Hash, IP, domini, URL, email, CVE, ID ATT&CK, indirizzi MAC o nomi di minacce. Sono accettati anche indicatori defanged.",
+	"Internal address: not sent to online sources.": "Indirizzo interno: non inviato alle fonti online.",
 	"Offline datasets not synced yet:": "Dataset offline non ancora sincronizzati:", "Sync them": "Sincronizzali",
 	"open cases": "casi aperti", "malicious indicators in open cases": "indicatori malevoli nei casi aperti",
 	"suspicious indicators in open cases": "indicatori sospetti nei casi aperti", "sources enabled": "fonti attive",

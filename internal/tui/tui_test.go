@@ -19,7 +19,7 @@ import (
 	"github.com/ciruzz00/astro/internal/store"
 )
 
-// fakeProvider flags 198.51.100.7 and returns terminal escape sequences in
+// fakeProvider flags 8.8.8.8 and returns terminal escape sequences in
 // its summary, which must never reach the screen.
 type fakeProvider struct{ name string }
 
@@ -27,7 +27,7 @@ func (f fakeProvider) Name() string           { return f.name }
 func (f fakeProvider) Supports(ioc.Type) bool { return true }
 func (f fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Result, error) {
 	v := provider.VerdictClean
-	if i.Value == "198.51.100.7" {
+	if i.Value == "8.8.8.8" {
 		v = provider.VerdictMalicious
 	}
 	return &provider.Result{Found: true, Verdict: v, Summary: "seen\x1b[2J\x1b]0;pwned\x07 by " + f.name,
@@ -114,7 +114,7 @@ func screen(m Model) string { return m.View().Content }
 
 func TestSearchShowsSanitizedResults(t *testing.T) {
 	m := newModel(t)
-	m = typeText(t, m, "beacon to 198.51.100[.]7 and example.com")
+	m = typeText(t, m, "beacon to 8.8.8[.]8 and example.com")
 	m = key(t, m, "enter")
 	if len(m.reports) != 2 || m.reports[0].Verdict != provider.VerdictMalicious {
 		t.Fatalf("reports = %+v", m.reports)
@@ -125,7 +125,7 @@ func TestSearchShowsSanitizedResults(t *testing.T) {
 			t.Errorf("screen contains control sequence %q", bad)
 		}
 	}
-	for _, want := range []string{"198.51.100.7", "malicious", "Owner", "seen", "2 indicators searched"} {
+	for _, want := range []string{"8.8.8.8", "malicious", "Owner", "seen", "2 indicators searched"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("screen missing %q", want)
 		}
@@ -214,7 +214,7 @@ func TestCaseWorkflow(t *testing.T) {
 	steps := []struct {
 		key, text, want string
 	}{
-		{"i", "198.51.100.7 example.com", "2 new indicators added"},
+		{"i", "8.8.8.8 example.com", "2 new indicators added"},
 		{"s", "", "2 indicators searched"},
 		{"m", "Initial access via phishing", "note added"},
 		{"e", "md", "exported to inc-1.md"},
@@ -259,7 +259,7 @@ func TestSaveSearchResultsToCase(t *testing.T) {
 	if err := m.cfg.Cases.Create(context.Background(), "inc-2", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
-	m = typeText(t, m, "198.51.100.7")
+	m = typeText(t, m, "8.8.8.8")
 	m = key(t, m, "enter")
 	m = key(t, m, "ctrl+s")
 	if m.prompt == nil {

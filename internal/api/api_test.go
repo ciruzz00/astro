@@ -29,7 +29,7 @@ func (fakeVerifier) Verify(_ context.Context, secret string) (*store.Token, erro
 	return nil, io.EOF
 }
 
-// fakeProvider flags 198.51.100.7 as malicious and everything else clean.
+// fakeProvider flags 8.8.8.8 as malicious and everything else clean.
 type fakeProvider struct {
 	name  string
 	local bool
@@ -37,11 +37,13 @@ type fakeProvider struct {
 
 func (f fakeProvider) Name() string { return f.name }
 
+func (f fakeProvider) Offline() bool { return f.local }
+
 func (f fakeProvider) Supports(t ioc.Type) bool { return true }
 
 func (f fakeProvider) Lookup(_ context.Context, i ioc.Indicator) (*provider.Result, error) {
 	v := provider.VerdictClean
-	if i.Value == "198.51.100.7" {
+	if i.Value == "8.8.8.8" {
 		v = provider.VerdictMalicious
 	}
 	return &provider.Result{Found: true, Verdict: v, Summary: f.name}, nil
@@ -136,12 +138,12 @@ func TestSecurityHeaders(t *testing.T) {
 func TestSearch(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp, body := do(t, srv, "GET", "/api/v1/search?q=198.51.100%5B.%5D7", goodToken, "")
+	resp, body := do(t, srv, "GET", "/api/v1/search?q=8.8.8%5B.%5D8", goodToken, "")
 	var rep engine.Report
 	if resp.StatusCode != 200 || json.Unmarshal([]byte(body), &rep) != nil {
 		t.Fatalf("GET search: %d %s", resp.StatusCode, body)
 	}
-	if rep.Indicator.Value != "198.51.100.7" || rep.Verdict != provider.VerdictMalicious || len(rep.Results) != 2 {
+	if rep.Indicator.Value != "8.8.8.8" || rep.Verdict != provider.VerdictMalicious || len(rep.Results) != 2 {
 		t.Errorf("report = %+v", rep)
 	}
 
@@ -204,18 +206,18 @@ func TestBadRequests(t *testing.T) {
 func TestExtractAndEnrich(t *testing.T) {
 	srv := newTestServer(t)
 
-	_, body := do(t, srv, "POST", "/api/v1/extract", goodToken, `{"text":"beacon to hxxp://evil[.]example[.]com from 198.51.100.7"}`)
-	if !strings.Contains(body, `"value":"http://evil.example.com"`) || !strings.Contains(body, `"value":"198.51.100.7"`) {
+	_, body := do(t, srv, "POST", "/api/v1/extract", goodToken, `{"text":"beacon to hxxp://evil[.]example[.]com from 8.8.8.8"}`)
+	if !strings.Contains(body, `"value":"http://evil.example.com"`) || !strings.Contains(body, `"value":"8.8.8.8"`) {
 		t.Errorf("extract = %s", body)
 	}
 
-	alert := `{"text":"{\"alert\":\"C2 traffic\",\"dst\":\"198.51.100.7\",\"src\":\"192.0.2.10\"}","indicators":["example.com"]}`
+	alert := `{"text":"{\"alert\":\"C2 traffic\",\"dst\":\"8.8.8.8\",\"src\":\"192.0.2.10\"}","indicators":["example.com"]}`
 	resp, body := do(t, srv, "POST", "/api/v1/enrich", goodToken, alert)
 	var er EnrichResponse
 	if resp.StatusCode != 200 || json.Unmarshal([]byte(body), &er) != nil {
 		t.Fatalf("enrich: %d %s", resp.StatusCode, body)
 	}
-	if er.Verdict != provider.VerdictMalicious || er.Searched != 3 || len(er.Malicious) != 1 || er.Malicious[0].Value != "198.51.100.7" {
+	if er.Verdict != provider.VerdictMalicious || er.Searched != 3 || len(er.Malicious) != 1 || er.Malicious[0].Value != "8.8.8.8" {
 		t.Errorf("enrich = %+v", er)
 	}
 }
@@ -279,7 +281,7 @@ func TestCases(t *testing.T) {
 	}
 
 	resp, body = do(t, srv, "POST", "/api/v1/cases/inc-42/indicators", goodToken,
-		`{"text":"mail from 198.51.100.7 linking hxxps://evil[.]example[.]com","indicators":["T1566.001"],"search":true}`)
+		`{"text":"mail from 8.8.8.8 linking hxxps://evil[.]example[.]com","indicators":["T1566.001"],"search":true}`)
 	if resp.StatusCode != 200 || body != `{"added":3,"given":3,"searched":3}`+"\n" {
 		t.Fatalf("add: %d %s", resp.StatusCode, body)
 	}

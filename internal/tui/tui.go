@@ -481,7 +481,10 @@ func reportText(rep *engine.Report, width int) string {
 	fmt.Fprintf(b, "%s  %s  %s\n", sBold.Render(render.Sanitize(rep.Indicator.Value)),
 		sMuted.Render(string(rep.Indicator.Type)), verdictStyle(rep.Verdict).Render(strings.ToUpper(verdictLabel(rep.Verdict))))
 	fmt.Fprintf(b, "%s\n", sMuted.Render("defanged: "+render.Sanitize(ioc.Defang(rep.Indicator))))
-	if len(rep.Results) == 0 {
+	if rep.Notice != "" {
+		b.WriteString("\n" + sWarn.Render(render.Sanitize(rep.Notice)) + "\n")
+	}
+	if len(rep.Results) == 0 && rep.Notice == "" {
 		b.WriteString(sMuted.Render("\nNo enabled source supports this indicator type.\n"))
 	}
 	for _, r := range rep.Results {

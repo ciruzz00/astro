@@ -584,6 +584,10 @@ func (d *pdfDoc) details() {
 			}
 			d.result(r)
 		}
+		if it.Report.Notice != "" {
+			d.gp.SetY(d.gp.GetY() + 3)
+			d.paragraph(margin+12, contentW-12, "Note: "+it.Report.Notice, fSans, 7.8, colMuted, 10.5)
+		}
 		if len(noData) > 0 {
 			d.gp.SetY(d.gp.GetY() + 3)
 			d.paragraph(margin+12, contentW-12, "No data from: "+strings.Join(noData, ", "), fSans, 7.8, colFaint, 10.5)

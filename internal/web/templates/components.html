@@ -45,7 +45,8 @@
       {{template "verdict" .Verdict}}
     </div>
   </header>
-  {{if not .Results}}<p class="muted">{{t "No enabled source supports this indicator type."}}</p>{{end}}
+  {{with .Notice}}<p class="notice">{{t "Internal address: not sent to online sources."}}</p>{{end}}
+  {{if and (not .Results) (not .Notice)}}<p class="muted">{{t "No enabled source supports this indicator type."}}</p>{{end}}
   {{range shown .Results}}
   <details class="result" open>
     <summary>

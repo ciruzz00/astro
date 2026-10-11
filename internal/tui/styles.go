@@ -23,6 +23,7 @@ var (
 	sBold     = lipgloss.NewStyle().Bold(true)
 	sSelected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(cAccent)
 	sError    = lipgloss.NewStyle().Foreground(cRed)
+	sWarn     = lipgloss.NewStyle().Foreground(cYellow)
 	sOK       = lipgloss.NewStyle().Foreground(cGreen)
 	sKey      = lipgloss.NewStyle().Bold(true).Foreground(cAccent)
 	sPane     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(cMuted).Padding(0, 1)

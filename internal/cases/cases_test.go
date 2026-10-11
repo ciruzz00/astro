@@ -18,7 +18,7 @@ func (fake) Name() string           { return "fake" }
 func (fake) Supports(ioc.Type) bool { return true }
 func (fake) Lookup(_ context.Context, i ioc.Indicator) (*provider.Result, error) {
 	v := provider.VerdictClean
-	if i.Value == "198.51.100.7" {
+	if i.Value == "8.8.8.8" {
 		v = provider.VerdictMalicious
 	}
 	return &provider.Result{Found: true, Verdict: v, Summary: "fake says " + string(v)}, nil
@@ -71,11 +71,11 @@ func TestCaseLifecycle(t *testing.T) {
 		}
 	}
 
-	n, err := s.Add(ctx, "sherlock-1", []ioc.Indicator{ind("198.51.100.7"), ind("example.com"), ind("T1059.001")}, "from triage")
+	n, err := s.Add(ctx, "sherlock-1", []ioc.Indicator{ind("8.8.8.8"), ind("example.com"), ind("T1059.001")}, "from triage")
 	if err != nil || n != 3 {
 		t.Fatalf("Add = %d, %v", n, err)
 	}
-	if n, _ := s.Add(ctx, "sherlock-1", []ioc.Indicator{ind("198.51.100.7")}, ""); n != 0 {
+	if n, _ := s.Add(ctx, "sherlock-1", []ioc.Indicator{ind("8.8.8.8")}, ""); n != 0 {
 		t.Errorf("re-adding must not duplicate, added %d", n)
 	}
 	if _, err := s.Add(ctx, "nope", []ioc.Indicator{ind("8.8.8.8")}, ""); !errors.Is(err, ErrNotFound) {

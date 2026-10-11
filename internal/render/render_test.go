@@ -43,3 +43,14 @@ func TestTextNeverPrintsProviderEscapes(t *testing.T) {
 		}
 	}
 }
+
+func TestTextShowsNotice(t *testing.T) {
+	rep := &engine.Report{Indicator: ioc.Indicator{Type: ioc.IPv4, Value: "10.0.0.5"}, Notice: engine.NoticeInternal}
+	var b strings.Builder
+	if err := Text(&b, rep, Style{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), engine.NoticeInternal) || strings.Contains(b.String(), "no provider supports") {
+		t.Errorf("text = %q", b.String())
+	}
+}

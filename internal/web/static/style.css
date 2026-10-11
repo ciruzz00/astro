@@ -301,6 +301,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .fields dt { color: var(--muted); }
 .fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); }
 .ref { margin: .35rem 0 0 calc(.7rem + 8.5rem + 7rem + 2.25rem); font-size: .82rem; }
+.notice { margin: 0; padding: .6rem 1.25rem; border-top: 1px solid var(--sus-line); font-size: .85rem; background: var(--sus-bg); color: var(--sus); }
 .nodata { margin: 0; padding: .6rem 1.25rem; border-top: 1px solid var(--border); font-size: .8rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: .3rem .4rem; align-items: center; background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
 .nodata > span:first-child { margin-right: .2rem; }
 .nodata .src { font-family: var(--mono); font-size: .74rem; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 .4rem; background: var(--surface); }

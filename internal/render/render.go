@@ -56,7 +56,10 @@ func (s Style) verdict(v provider.Verdict) string {
 func Text(w io.Writer, rep *engine.Report, st Style) error {
 	ew := &errWriter{w: w}
 	ew.printf("%s  %s  %s\n", st.bold(Sanitize(ioc.Defang(rep.Indicator))), st.dim("["+string(rep.Indicator.Type)+"]"), st.verdict(rep.Verdict))
-	if len(rep.Results) == 0 {
+	if rep.Notice != "" {
+		ew.printf("  %s\n", st.paint("33", Sanitize(rep.Notice)))
+	}
+	if len(rep.Results) == 0 && rep.Notice == "" {
 		ew.printf("  %s\n", st.dim("no provider supports this indicator type yet"))
 	}
 	for _, r := range rep.Results {

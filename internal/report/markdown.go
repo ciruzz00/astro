@@ -51,6 +51,9 @@ func Markdown(w io.Writer, v *cases.View, o Options) error {
 			}
 			fmt.Fprintf(b, "\n### `%s`\n\n", code(ioc.Defang(it.Indicator)))
 			fmt.Fprintf(b, "Searched %s.\n\n", it.SearchedAt.Format("2006-01-02 15:04 UTC"))
+			if it.Report.Notice != "" {
+				fmt.Fprintf(b, "> %s\n\n", md(it.Report.Notice))
+			}
 			for _, r := range it.Report.Results {
 				switch {
 				case r.Error != "":

@@ -32,12 +32,14 @@ defanged input (hxxps://evil[.]com) is accepted. Quote multi-word names.
 With --file, every indicator found in the file (or stdin with "-") is searched.
 
 Online sources receive the indicator you search: use --offline (or --only)
-for sensitive indicators that must not leave this machine.`,
+for sensitive indicators that must not leave this machine. Internal addresses
+(private, loopback, link-local, CGNAT, documentation and other reserved
+ranges) are never sent to online sources.`,
 		Example: `  astro search 44d88612fea8a8f36de82e1278abb02f
   astro search CVE-2021-44228 T1059.001 "Lazarus Group"
   astro search 00:50:56:aa:bb:cc
   astro search --file incident.log --json
-  astro search --offline 10.0.0.5
+  astro search --offline evil.example.com
   astro search --only virustotal,malwarebazaar 44d88612fea8a8f36de82e1278abb02f
   astro search --case sherlock-1 -f notes.txt`,
 		RunE: func(cmd *cobra.Command, args []string) error {

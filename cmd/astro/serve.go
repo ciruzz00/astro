@@ -241,7 +241,7 @@ func (a *app) apiSources() []api.Source {
 		src := api.Source{
 			Name:       s.provider.Name(),
 			Enabled:    s.enabled(),
-			Offline:    s.local,
+			Offline:    s.local(),
 			Indicators: strings.Split(supported(s), ", "),
 		}
 		if !src.Enabled {
