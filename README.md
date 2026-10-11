@@ -21,6 +21,7 @@ DFIR challenges such as Hack The Box Sherlocks or TryHackMe rooms.
 - [REST API](#rest-api)
 - [Sources and API keys](#sources-and-api-keys)
 - [Security and OPSEC](#security-and-opsec)
+- [In development: log analysis](#in-development-log-analysis)
 - [Development](#development)
 - [In italiano](#in-italiano)
 
@@ -305,6 +306,33 @@ astro keys unset virustotal
 Please report vulnerabilities privately through
 [GitHub security advisories](https://github.com/ciruzz00/astro/security/advisories/new).
 
+## In development: log analysis
+
+The next release (v0.2.0) turns astro from an indicator search engine into a
+small log analysis workbench: point it at the logs of a compromised host and
+get a timeline in which the events that matter stand out in red. It is being
+built in steps on `main`; the parsers below are already in the code base and
+tested, while the commands and views that use them are still to come.
+
+| Status | Feature |
+|---|---|
+| ✅ ready | **Evidence handling.** Files are read where they are and never copied or changed. Each one is hashed (SHA-256, SHA-1, MD5) and gets a chain of custody that can only be appended to and is hash-chained, so later edits are detected. Compressed logs (`.gz`) are read transparently. |
+| ✅ ready | **Linux logs.** `auth.log`, `secure` and `syslog` (RFC 3164, RFC 5424 and ISO formats): SSH logins and failures, `sudo`, `su`, `pkexec`, accounts and groups created or changed, password changes, cron jobs, sessions and services. |
+| ✅ ready | **Login records.** `wtmp`, `btmp` and `utmp`: logins, logouts, failed logins, boots and shutdowns. |
+| ✅ ready | **Shell history.** bash and zsh, with or without timestamps, multi-line commands included. |
+| ✅ ready | **Web and container logs.** Web server access logs (Common and Combined formats) and Docker container logs, with client address, request, status and User-Agent. |
+| ✅ ready | **Signs of tampering.** Runs of NUL bytes in a text log, left when a log is truncated while being written or the system stops abruptly, become events of their own. |
+| 🚧 in progress | **Windows event logs (EVTX)**, read by a parser written from scratch with the Go standard library only. |
+| 🔜 planned | **Detection rules** mapped to MITRE ATT&CK: brute force followed by a login, new administrators, persistence, suspicious commands, cleared logs, Kerberoasting, DCSync and more. |
+| 🔜 planned | **Timeline and findings** in the command line (`astro logs …`), the terminal interface, the web interface and the REST API, with filters and severity colors. |
+| 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
+
+The same principles as the rest of astro apply: no new dependencies (every
+parser uses the Go standard library), evidence files are treated as untrusted
+input (size limits, streaming, no symbolic links followed, fuzz tests for every
+parser), and internal addresses found in the logs are never sent to online
+sources.
+
 ## Development
 
 astro is written in Go and built entirely in Docker: no Go toolchain is needed
@@ -332,6 +360,8 @@ internal/api/       REST API and OpenAPI spec
 internal/web/       web interface (templates, translations, static files)
 internal/tui/       terminal interface
 internal/store/     SQLite storage and migrations
+internal/logs/      event model, log format detection and parsers (in development)
+internal/evidence/  evidence import: hashes, chain of custody, events (in development)
 ```
 
 ## In italiano
@@ -352,6 +382,17 @@ challenge DFIR come le Sherlock di Hack The Box e TryHackMe.
 
 Gli indirizzi interni (IP privati, loopback, link-local, CGNAT, documentali e
 riservati) non vengono mai inviati alle fonti online: restano sul tuo computer.
+
+**In sviluppo (v0.2.0): analisi dei log.** astro sta diventando anche un banco
+di lavoro per i log: gli dai i log di una macchina compromessa e ottieni una
+timeline con gli eventi gravi in rosso. Sono già pronti, nel codice e testati,
+la gestione delle prove (lette dove sono, mai copiate né modificate, con hash e
+catena di custodia a prova di modifica) e i parser per auth.log/syslog, wtmp,
+btmp e utmp, la history di bash e zsh, gli access log dei server web e i log
+dei container Docker, compresi i segni di log troncati. Sono in corso il parser
+degli eventi Windows (EVTX), scritto da zero con la sola libreria standard di
+Go, e poi arriveranno le regole di rilevamento mappate su MITRE ATT&CK, la
+timeline e i finding in tutte le interfacce e nei report.
 
 ## License
 
