@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ciruzz00/astro/internal/logs"
+	"github.com/ciruzz00/astro/internal/logs/config"
 	"github.com/ciruzz00/astro/internal/logs/live"
 )
 
@@ -60,5 +61,28 @@ ESTAB  0      0          192.0.2.10:50002     10.0.0.5:6667   users:(("ircbot",p
 	}
 	if ind := Indicators(got["live-shell-connection"]); len(ind) == 0 || ind[0].Value != "203.0.113.9" {
 		t.Errorf("indicators = %v", ind)
+	}
+}
+
+func TestConfigRules(t *testing.T) {
+	ev := func(kind, cmd string, f map[string]string) logs.Event {
+		return logs.Event{Time: t0, Host: "web01", Kind: kind, CommandLine: cmd, Fields: f, Message: cmd}
+	}
+	evs := []logs.Event{
+		ev(config.KindAptHook, "touch /var/lib/apt/periodic/refresh-stamp 2>/dev/null || true", map[string]string{"hook": "APT::Update::Post-Invoke-Success"}),
+		ev(config.KindAptHook, "if [ -d /var/lib/example-notifier ]; then touch /var/lib/example-notifier/run-stamp; fi; /usr/lib/example-notifier/refresh 2>/dev/null || true", map[string]string{"hook": "DPkg::Post-Invoke"}),
+		ev(config.KindAptHook, "bash -c 'nohup /usr/local/bin/agent > /dev/null 2>&1 &'", map[string]string{"hook": "DPkg::Post-Invoke"}),
+		ev(config.KindCronEntry, "/home/alice/.x/run", map[string]string{"schedule": "@reboot"}),
+		ev(config.KindCronEntry, "cd / && run-parts --report /etc/cron.hourly", map[string]string{"schedule": "17 * * * *"}),
+		ev(config.KindSystemdExec, "/usr/bin/socat TCP-LISTEN:2323,fork EXEC:/opt/legacy/telnetd", map[string]string{"directive": "ExecStart"}),
+	}
+	got, _ := run(evs)
+	for id, n := range map[string]int{"config-apt-hook": 1, "config-hidden-program": 1, "live-socat-listener": 1} {
+		if c := len(got[id]); c != n {
+			t.Errorf("%s: %d findings, want %d (%+v)", id, c, n, got[id])
+		}
+	}
+	if h := got["config-apt-hook"]; len(h) == 1 && !strings.Contains(h[0].Summary, "DPkg::Post-Invoke: bash -c") {
+		t.Errorf("hook summary = %q", h[0].Summary)
 	}
 }

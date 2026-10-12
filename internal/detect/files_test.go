@@ -41,6 +41,9 @@ func TestFileRules(t *testing.T) {
 		line("/home/alice/proj/.git/hooks/pre-commit.sample", "-rwxrwxr-x", at(day)),
 		line("/home/alice/.local/bin/tool", "-rwxr-xr-x", at(day)),
 		line("/tmp/notes.txt", "-rw-r--r--", at(day)),
+		line("/tmp/.X11-unix/x.py", "-rw-rw-r--", at(day)),
+		line("/tmp/.X11-unix/X0", "srwxrwxrwx", at(day)),
+		line("/var/tmp/stage.sh", "-rw-r--r--", at(day)),
 		line("/dev/shm/k", "-rwx------", at(day)),
 		line("/etc/apt/apt.conf.d/99hook", "-rw-r--r--", at(day+100)),
 		line("/root/.ssh/authorized_keys", "-rw-------", at(day+200)),
@@ -61,7 +64,10 @@ func TestFileRules(t *testing.T) {
 	}
 	got, _ := run(bodyEvents(t, lines))
 
-	if h := got["fs-exec-hidden"]; len(h) != 2 {
+	if x := got["fs-socket-dir-file"]; len(x) != 1 || !strings.Contains(x[0].Summary, "x.py") {
+		t.Errorf("socket folder = %+v", x)
+	}
+	if h := got["fs-exec-hidden"]; len(h) != 3 {
 		t.Errorf("hidden executables = %+v", h)
 	} else if !strings.Contains(h[0].Summary+h[1].Summary, "/home/alice/proj/tools/.cache/agent") {
 		t.Errorf("hidden summary = %q / %q", h[0].Summary, h[1].Summary)
@@ -93,14 +99,19 @@ func TestFileRules(t *testing.T) {
 
 func TestHiddenOrTemp(t *testing.T) {
 	for p, want := range map[string]bool{
-		"/tmp/x":                             true,
-		"/var/tmp/a/b":                       true,
-		"/usr/bin/.sshd":                     true,
-		"/home/bob/p/vendor/.cache/u":        true,
-		"/home/bob/.cache/ms-playwright/run": false,
-		"/home/bob/p/node_modules/.bin/tsc":  false,
-		"/root/.local/bin/x":                 false,
-		"/usr/bin/curl":                      false,
+		"/tmp/x":                                true,
+		"/var/tmp/a/b":                          true,
+		"/usr/bin/.sshd":                        true,
+		"/home/bob/p/vendor/.cache/u":           true,
+		"/home/bob/.cache/ms-playwright/run":    false,
+		"/home/bob/p/node_modules/.bin/tsc":     false,
+		"/root/.local/bin/x":                    false,
+		"/usr/bin/curl":                         false,
+		"/app/home/.cache/uv/archive/x/bin/run": false,
+		"/app/.venv/.lock":                      false,
+		"/.dockerenv":                           false,
+		"/opt/tool/.fossa.yml":                  false,
+		"/opt/tool/.hidden":                     true,
 	} {
 		if got := hiddenOrTemp(p); got != want {
 			t.Errorf("hiddenOrTemp(%s) = %v", p, got)

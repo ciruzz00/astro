@@ -25,7 +25,8 @@ const (
 )
 
 var (
-	ruleHiddenExec = Rule{"fs-exec-hidden", "Executable file created in a temporary or hidden folder", logs.Medium, "T1564.001"}
+	ruleHiddenExec = Rule{"fs-exec-hidden", "Executable or script created in a temporary or hidden folder", logs.Medium, "T1564.001"}
+	ruleSocketDir  = Rule{"fs-socket-dir-file", "File hidden in an X11 or ICE socket folder", logs.High, "T1564.001"}
 	ruleStaging    = Rule{"fs-archive-then-transfer", "Archive tool followed by a transfer tool (staging and exfiltration)", logs.High, "T1560.001"}
 	ruleBulkRead   = Rule{"fs-bulk-read", "Many user files read at once (archiving or copying)", logs.Medium, "T1119"}
 
@@ -55,6 +56,9 @@ var (
 	reTransferTool = regexp.MustCompile(`^/(usr/)?(local/)?bin/(curl|wget|scp|sftp|nc|ncat|netcat|rsync|rclone|ftp|lftp|smbclient)$`)
 	reTempPlace    = regexp.MustCompile(`^/(tmp|var/tmp|dev/shm)/`)
 	reUserData     = regexp.MustCompile(`^/(home/[^/]+|root|srv|var/www)/`)
+	reScript       = regexp.MustCompile(`(?i)\.(sh|bash|py|pl|rb|php|elf|bin|so|run)$`)
+	// These folders hold only sockets and lock files of the X server.
+	reSocketDir = regexp.MustCompile(`^/tmp/\.(X11|ICE|font|XIM|Test)-unix/`)
 )
 
 // systemRoots are created when the system is installed.
@@ -68,8 +72,20 @@ var usualHidden = map[string]bool{
 	".nuxt": true, ".svelte-kit": true, ".angular": true, ".yarn": true, ".pnpm-store": true, ".cargo": true,
 	".rustup": true, ".nvm": true, ".pyenv": true, ".rbenv": true, ".local": true, ".npm": true, ".gradle": true,
 	".m2": true, ".conda": true, ".deno": true, ".bun": true, ".gem": true, ".dotnet": true, ".vscode-server": true,
-	".cursor-server": true, ".mozilla": true, ".steam": true, ".var": true, ".config": true,
+	".cursor-server": true, ".mozilla": true, ".steam": true, ".var": true, ".config": true, ".docker": true,
+	".kube": true, ".krew": true, ".asdf": true, ".sdkman": true, ".nix-profile": true, ".linuxbrew": true,
 }
+
+// cacheTools are folders of ~/.cache where tools keep downloaded programs.
+var cacheTools = map[string]bool{
+	"uv": true, "pip": true, "ms-playwright": true, "pypoetry": true, "go-build": true, "node-gyp": true, "yarn": true,
+	"puppeteer": true, "Cypress": true, "electron": true, "huggingface": true, "torch": true, "bazel": true,
+	"JetBrains": true, "mesa_shader_cache": true, "gstreamer-1.0": true, "fontconfig": true, "pnpm": true, "deno": true,
+	"bun": true, "Homebrew": true, "pre-commit": true, "golangci-lint": true, "selenium": true,
+}
+
+// plainHiddenNames are hidden files that tools create on purpose.
+var plainHiddenNames = map[string]bool{".lock": true, ".dockerenv": true, ".keep": true, ".gitkeep": true, ".placeholder": true}
 
 // fileRules follow filesystem events.
 type fileRules struct {
@@ -108,8 +124,13 @@ func (r *fileRules) observe(e *logs.Event, en *Engine) {
 	}
 	dir := strings.HasPrefix(mode, "d")
 
-	if e.Kind == bodyfile.KindCreated && !dir && executable(mode) && hiddenOrTemp(p) {
-		en.hit(ruleHiddenExec, strings.ToLower(e.Host)+"|"+path.Dir(p), e, p)
+	if e.Kind == bodyfile.KindCreated && strings.HasPrefix(mode, "-") {
+		switch {
+		case reSocketDir.MatchString(p):
+			en.hit(ruleSocketDir, strings.ToLower(e.Host)+"|"+path.Dir(p), e, p)
+		case (executable(mode) && hiddenOrTemp(p)) || (reScript.MatchString(p) && reTempPlace.MatchString(p)):
+			en.hit(ruleHiddenExec, strings.ToLower(e.Host)+"|"+path.Dir(p), e, p)
+		}
 	}
 	// Package files keep the dates of the package, older than the system:
 	// only changes after the installation count.
@@ -223,12 +244,20 @@ func executable(mode string) bool {
 // hiddenOrTemp reports files in temporary folders, files with a hidden
 // name, and files in hidden folders nested inside a home or project tree.
 func hiddenOrTemp(p string) bool {
-	if reTempPlace.MatchString(p) || strings.HasPrefix(path.Base(p), ".") {
+	base := path.Base(p)
+	if reTempPlace.MatchString(p) {
+		return true
+	}
+	// A hidden program has no extension, or a script one (.sh, .py...).
+	if strings.HasPrefix(base, ".") && !plainHiddenNames[base] && (!strings.Contains(base[1:], ".") || reScript.MatchString(base)) {
 		return true
 	}
 	parts := strings.Split(strings.Trim(path.Dir(p), "/"), "/")
 	for i, c := range parts {
 		if !strings.HasPrefix(c, ".") || usualHidden[c] {
+			continue
+		}
+		if c == ".cache" && i+1 < len(parts) && cacheTools[parts[i+1]] {
 			continue
 		}
 		// The hidden folders right in a home are the user's settings.

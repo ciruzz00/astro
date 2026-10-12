@@ -7,13 +7,17 @@ import (
 	"strings"
 
 	"github.com/ciruzz00/astro/internal/logs"
+	"github.com/ciruzz00/astro/internal/logs/config"
 	"github.com/ciruzz00/astro/internal/logs/live"
 )
 
 // Rules on the process and socket listings of a live triage.
 var (
 	reKernelThreadName = regexp.MustCompile(`^\[[^\]]{1,64}\]$`)
-	reSocatListener    = regexp.MustCompile(`(?i)\bsocat\b.*\btcp[46]?-listen:.*\b(exec|system|file:/dev/pts|pty)\b`)
+	// Hooks of the stock packages end with "|| true" or "> /dev/null"; a
+	// hook that detaches a program or fetches code does not.
+	reSuspiciousHook = regexp.MustCompile(`(?i)\bnohup\b|&\s*['"]?\s*$|\b(ba|da|z)?sh\s+-c\b|/(tmp|var/tmp|dev/shm|home|root)/|\b(curl|wget|nc|ncat|socat)\b|base64|python[0-9.]*\s+-c|/dev/tcp/`)
+	reSocatListener  = regexp.MustCompile(`(?i)\bsocat\b.*\btcp[46]?-listen:.*\b(exec|system|file:/dev/pts|pty)\b`)
 	// Programs that should not hold a network connection of their own.
 	shellish = map[string]bool{"bash": true, "sh": true, "dash": true, "zsh": true, "ksh": true, "csh": true, "tcsh": true,
 		"python": true, "python2": true, "python3": true, "perl": true, "ruby": true, "php": true, "lua": true, "node": true,
@@ -35,8 +39,18 @@ func init() {
 			}},
 		eventRule{Rule: Rule{"live-socat-listener", "Shell, terminal or program exposed on the network with socat", logs.Medium, "T1059.004"},
 			match: func(e *logs.Event) bool {
-				return e.Kind == live.KindProcess && reSocatListener.MatchString(e.CommandLine)
-			}},
+				return (e.Kind == live.KindProcess || scheduled(e)) && reSocatListener.MatchString(e.CommandLine)
+			},
+			group: func(e *logs.Event) string { return strings.ToLower(e.Host) + "|" + e.CommandLine }},
+		eventRule{Rule: Rule{"config-apt-hook", "Package manager hook runs a detached or downloaded program", logs.High, "T1546.016"},
+			match: func(e *logs.Event) bool {
+				return e.Kind == config.KindAptHook && reSuspiciousHook.MatchString(strings.TrimSpace(e.CommandLine))
+			},
+			group:   func(e *logs.Event) string { return strings.ToLower(e.Host) + "|" + e.CommandLine },
+			example: func(e *logs.Event) string { return field(e, "hook") + ": " + e.CommandLine }},
+		eventRule{Rule: Rule{"config-hidden-program", "Scheduled command runs a program from a hidden or temporary folder", logs.High, "T1053"},
+			match: func(e *logs.Event) bool { return scheduled(e) && hiddenProgram(e.CommandLine) },
+			group: func(e *logs.Event) string { return strings.ToLower(e.Host) + "|" + e.CommandLine }},
 		eventRule{Rule: Rule{"live-shell-connection", "Shell or interpreter connected to an external address (reverse shell)", logs.High, "T1059.004"},
 			match: func(e *logs.Event) bool { return established(e) && external(e.DstIP) && ownedByShell(e) },
 			group: func(e *logs.Event) string { return strings.ToLower(e.Host) + "|" + e.DstIP }},
@@ -51,6 +65,11 @@ func init() {
 			},
 			group: func(e *logs.Event) string { return strings.ToLower(e.Host) + "|" + field(e, "local") }},
 	)
+}
+
+// scheduled reports commands configured to run later (cron, systemd).
+func scheduled(e *logs.Event) bool {
+	return e.Kind == config.KindCronEntry || e.Kind == config.KindSystemdExec
 }
 
 func established(e *logs.Event) bool {
