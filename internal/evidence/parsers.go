@@ -4,6 +4,7 @@ import (
 	"github.com/ciruzz00/astro/internal/logs"
 	"github.com/ciruzz00/astro/internal/logs/access"
 	"github.com/ciruzz00/astro/internal/logs/docker"
+	"github.com/ciruzz00/astro/internal/logs/evtx"
 	"github.com/ciruzz00/astro/internal/logs/history"
 	"github.com/ciruzz00/astro/internal/logs/syslog"
 	"github.com/ciruzz00/astro/internal/logs/utmp"
@@ -16,5 +17,6 @@ func DefaultParsers() []logs.Parser {
 		utmp.New(logs.KindWtmp), utmp.New(logs.KindBtmp), utmp.New(logs.KindUtmp),
 		history.New(logs.KindBashHistory), history.New(logs.KindZshHistory),
 		access.New(), docker.New(),
+		evtx.New(),
 	}
 }
