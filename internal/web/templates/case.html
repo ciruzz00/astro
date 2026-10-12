@@ -30,6 +30,8 @@
   </div>
 </header>
 
+{{template "case-tabs" (tab $c.Name "overview")}}
+
 {{with $c.Description}}<p class="description">{{.}}</p>{{end}}
 
 <section class="tiles tiles-5">
@@ -39,6 +41,23 @@
   <div class="tile t-clean"><span class="tile-n">{{.Clean}}</span><span class="tile-l">{{t "Clean"}}</span></div>
   <div class="tile"><span class="tile-n">{{.Pending}}</span><span class="tile-l">{{t "Not searched"}}</span></div>
 </section>
+
+{{with .Logs}}{{$l := .}}
+<section class="card logs-summary">
+  <header class="card-head"><h2>{{t "Log analysis"}}</h2>
+    <a class="btn btn-sm" href="{{$base}}/evidence">{{template "icon" "download"}}{{t "Import logs"}}</a></header>
+  {{if .Evidence}}
+  <div class="row wrap">
+    <a href="{{$base}}/evidence"><strong>{{.Evidence}}</strong> {{t "evidence files"}}</a>
+    <span class="muted">·</span>
+    <a href="{{$base}}/timeline"><strong>{{.Events}}</strong> {{t "events"}}</a>
+    <span class="muted">·</span>
+    <a href="{{$base}}/findings"><strong>{{.Findings}}</strong> {{t "findings"}}</a>
+    {{range sevOrder}}{{$sev := .}}{{with index $l.BySev .}}<span class="badge {{sevClass $sev}}">{{.}} {{t (sevName $sev)}}</span>{{end}}{{end}}
+  </div>
+  {{else}}<p class="muted">{{t "Import Windows event logs, Linux logs, shell history or web and container logs to build a timeline and let the detection rules look for what matters."}}</p>{{end}}
+</section>
+{{end}}
 
 <section class="card">
   <header class="card-head"><h2>{{t "Tags"}}</h2></header>

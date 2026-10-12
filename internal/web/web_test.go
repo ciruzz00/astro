@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ciruzz00/astro/internal/api"
 	"github.com/ciruzz00/astro/internal/auth"
@@ -443,5 +444,111 @@ func TestItalianCatalogIsComplete(t *testing.T) {
 		if fmt.Sprint(reVerb.FindAllString(k, -1)) != fmt.Sprint(reVerb.FindAllString(v, -1)) {
 			t.Errorf("verbs differ: %q -> %q", k, v)
 		}
+	}
+}
+
+func TestLogAnalysisPages(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	if resp, _ := e.do(t, "POST", "/cases", url.Values{"name": {"inc-logs"}, "tlp": {"AMBER"}}); resp.StatusCode != 200 {
+		t.Fatalf("create case: %d", resp.StatusCode)
+	}
+	dir := t.TempDir()
+	var b strings.Builder
+	for i := range 12 {
+		fmt.Fprintf(&b, "Oct 11 21:00:%02d web01 sshd[1]: Failed password for root from 203.0.113.9 port 4%d ssh2\n", i, i)
+	}
+	b.WriteString("Oct 11 21:01:00 web01 sshd[1]: Accepted password for root from 203.0.113.9 port 4100 ssh2\n")
+	b.WriteString("Oct 11 21:02:00 web01 sudo:  root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/bin/echo <script>alert(1)</script>\n")
+	if err := os.WriteFile(filepath.Join(dir, "auth.log"), []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	mtime := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	_ = os.Chtimes(filepath.Join(dir, "auth.log"), mtime, mtime)
+
+	// Validation.
+	for _, tc := range []struct {
+		form url.Values
+		want string
+	}{
+		{url.Values{"path": {""}}, "Give the path"},
+		{url.Values{"path": {filepath.Join(dir, "missing")}}, "Cannot read"},
+		{url.Values{"path": {dir}, "tz": {"Mars/Olympus"}}, "Unknown time zone"},
+		{url.Values{"path": {dir}, "year": {"1800"}}, "The year must be"},
+	} {
+		if _, body := e.do(t, "POST", "/cases/inc-logs/logs/import", tc.form); !strings.Contains(body, tc.want) {
+			t.Errorf("import %v: page lacks %q", tc.form, tc.want)
+		}
+	}
+
+	_, body := e.do(t, "POST", "/cases/inc-logs/logs/import", url.Values{"path": {dir}, "tz": {"UTC"}})
+	if !strings.Contains(body, "Import started") {
+		t.Fatalf("import not started:\n%s", body)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, status := e.do(t, "GET", "/cases/inc-logs/logs/status", nil)
+		if strings.Contains(status, "Last import: 1 files, 14 events") {
+			break
+		}
+		if time.Now().After(deadline) || strings.Contains(status, "failed") {
+			t.Fatalf("import did not finish: %s", status)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	req, _ := http.NewRequest("GET", e.srv.URL+"/cases/inc-logs/logs/status", nil)
+	req.Header.Set("HX-Request", "true")
+	if resp, err := e.client.Do(req); err != nil || resp.Header.Get("HX-Refresh") != "true" {
+		t.Errorf("finished import does not ask htmx to refresh: %v", err)
+	}
+
+	_, body = e.do(t, "GET", "/cases/inc-logs/evidence", nil)
+	for _, want := range []string{"#1 auth.log", "custody verified", "Chain of custody (2)", "imported", "parsed"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("evidence page lacks %q", want)
+		}
+	}
+	_, body = e.do(t, "GET", "/cases/inc-logs", nil)
+	if !strings.Contains(body, "Log analysis") || !strings.Contains(body, "sev-critical") {
+		t.Errorf("case overview lacks the log summary")
+	}
+
+	_, body = e.do(t, "GET", "/cases/inc-logs/timeline?severity=critical", nil)
+	if !strings.Contains(body, "1 events") || !strings.Contains(body, "ev sev-critical") || !strings.Contains(body, "SSH login accepted for root") {
+		t.Errorf("critical timeline wrong:\n%s", body)
+	}
+	_, body = e.do(t, "GET", "/cases/inc-logs/timeline?q=alert", nil)
+	if strings.Contains(body, "<script>alert(1)</script>") || !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
+		t.Error("log content not escaped in the timeline")
+	}
+	if resp, body := e.do(t, "GET", "/cases/inc-logs/timeline?from=yesterday", nil); resp.StatusCode != 400 || !strings.Contains(body, "Invalid filter") {
+		t.Errorf("bad filter: %d", resp.StatusCode)
+	}
+	resp, csvBody := e.do(t, "GET", "/cases/inc-logs/timeline.csv?ip=203.0.113.9", nil)
+	if resp.Header.Get("Content-Disposition") != `attachment; filename="inc-logs-timeline.csv"` || strings.Count(csvBody, "\n") != 14 {
+		t.Errorf("csv: %q, %d lines", resp.Header.Get("Content-Disposition"), strings.Count(csvBody, "\n"))
+	}
+
+	_, body = e.do(t, "GET", "/cases/inc-logs/findings", nil)
+	for _, want := range []string{"Successful login after a brute force", "https://attack.mitre.org/techniques/T1110/", "Events that prove it", "auth.log"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("findings page lacks %q", want)
+		}
+	}
+	if _, body = e.do(t, "POST", "/cases/inc-logs/logs/analyze", url.Values{}); !strings.Contains(body, "Analysis done:") {
+		t.Error("analyze again")
+	}
+	if _, body = e.do(t, "POST", "/cases/inc-logs/logs/indicators", url.Values{}); !strings.Contains(body, "new indicators added to the case") {
+		t.Error("add indicators")
+	}
+	if items, _ := e.store.CaseByName(context.Background(), "inc-logs"); items == nil || len(items.Items) == 0 {
+		t.Error("indicators not stored in the case")
+	}
+	_, body = e.do(t, "GET", "/lang?l=it&next=/cases/inc-logs/findings", nil)
+	if !strings.Contains(body, "Eventi che lo provano") || !strings.Contains(body, "Analizza di nuovo") {
+		t.Error("findings page not translated")
+	}
+	if resp, _ := e.do(t, "GET", "/cases/nope/timeline", nil); resp.StatusCode != 404 {
+		t.Errorf("unknown case timeline: %d", resp.StatusCode)
 	}
 }

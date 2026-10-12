@@ -46,6 +46,9 @@ type Config struct {
 	Version string
 	// Secure marks the session cookie Secure (set when serving over TLS).
 	Secure bool
+	// Actor is recorded in the chain of custody of the evidence imported
+	// from the web interface.
+	Actor  string
 	Logger *slog.Logger
 }
 
@@ -55,11 +58,12 @@ type server struct {
 	pages    map[string]map[string]*template.Template
 	sessions *sessions
 	login    *rate.Limiter
+	jobs     *importJobs
 	now      func() time.Time
 }
 
 // pageFiles maps page names to their template files; each is parsed with the layout.
-var pageFiles = []string{"login", "home", "results", "extract", "cases", "case", "sources", "settings", "tokens", "guide", "error"}
+var pageFiles = []string{"login", "home", "results", "extract", "cases", "case", "evidence", "timeline", "findings", "sources", "settings", "tokens", "guide", "error"}
 
 // NewHandler returns the web interface handler.
 func NewHandler(cfg Config) (http.Handler, error) {
@@ -71,7 +75,11 @@ func NewHandler(cfg Config) (http.Handler, error) {
 		pages:    map[string]map[string]*template.Template{},
 		sessions: newSessions(),
 		login:    rate.NewLimiter(rate.Every(2*time.Second), 5),
+		jobs:     &importJobs{jobs: map[string]*importJob{}},
 		now:      time.Now,
+	}
+	if s.Actor == "" {
+		s.Actor = "analyst"
 	}
 	assets, err := assetURLs()
 	if err != nil {
@@ -123,6 +131,14 @@ func NewHandler(cfg Config) (http.Handler, error) {
 	authed.HandleFunc("POST /cases/{name}/status", s.caseStatus)
 	authed.HandleFunc("POST /cases/{name}/delete", s.caseDelete)
 	authed.HandleFunc("GET /cases/{name}/export", s.caseExport)
+	authed.HandleFunc("GET /cases/{name}/evidence", s.evidencePage)
+	authed.HandleFunc("POST /cases/{name}/logs/import", s.importLogs)
+	authed.HandleFunc("GET /cases/{name}/logs/status", s.importStatus)
+	authed.HandleFunc("POST /cases/{name}/logs/analyze", s.analyzeLogs)
+	authed.HandleFunc("POST /cases/{name}/logs/indicators", s.findingIndicators)
+	authed.HandleFunc("GET /cases/{name}/timeline", s.timelinePage)
+	authed.HandleFunc("GET /cases/{name}/timeline.csv", s.timelineCSV)
+	authed.HandleFunc("GET /cases/{name}/findings", s.findingsPage)
 	authed.HandleFunc("GET /sources", s.sourcesPage)
 	authed.HandleFunc("POST /sources/sync", s.syncDatasets)
 	authed.HandleFunc("GET /settings", s.settingsPage)

@@ -66,3 +66,24 @@
   {{with noData .Results}}<p class="nodata"><span>{{t "No data from"}}</span>{{range .}} <span class="src">{{.}}</span>{{end}}</p>{{end}}
 </article>
 {{end}}
+
+{{define "case-mini-head"}}
+<nav class="crumbs" aria-label="breadcrumb"><a href="/cases">{{t "Cases"}}</a> <span>/</span> <a href="/cases/{{.Name}}">{{.Name}}</a></nav>
+<header class="page-head case-head">
+  <div>
+    <div class="row">{{template "tlp" .TLP}}</div>
+    <h1>{{if .Title}}{{.Title}}{{else}}{{.Name}}{{end}}</h1>
+  </div>
+</header>
+{{end}}
+
+{{define "case-tabs"}}
+<nav class="tabs" aria-label="{{t "Case sections"}}">
+  <a href="/cases/{{.Name}}"{{if eq .Active "overview"}} aria-current="page"{{end}}>{{t "Overview"}}</a>
+  <a href="/cases/{{.Name}}/evidence"{{if eq .Active "evidence"}} aria-current="page"{{end}}>{{t "Evidence"}}</a>
+  <a href="/cases/{{.Name}}/timeline"{{if eq .Active "timeline"}} aria-current="page"{{end}}>{{t "Timeline"}}</a>
+  <a href="/cases/{{.Name}}/findings"{{if eq .Active "findings"}} aria-current="page"{{end}}>{{t "Findings"}}</a>
+</nav>
+{{end}}
+
+{{define "sev"}}<span class="badge {{sevClass .}}">{{t (sevName .)}}</span>{{end}}

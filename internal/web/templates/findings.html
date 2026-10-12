@@ -1,0 +1,49 @@
+{{define "content"}}
+{{with .Data}}{{$base := printf "/cases/%s" .Case.Name}}
+{{template "case-mini-head" .Case}}
+{{template "case-tabs" (tab .Case.Name "findings")}}
+
+<section class="tiles tiles-5 sev-tiles">
+  <a class="tile tile-link sev-critical" href="{{$base}}/timeline?severity=critical"><span class="tile-n">{{index .BySev 4}}</span><span class="tile-l">{{t "critical"}}</span></a>
+  <a class="tile tile-link sev-high" href="{{$base}}/timeline?severity=high"><span class="tile-n">{{index .BySev 3}}</span><span class="tile-l">{{t "high"}}</span></a>
+  <a class="tile tile-link sev-medium" href="{{$base}}/timeline?severity=medium"><span class="tile-n">{{index .BySev 2}}</span><span class="tile-l">{{t "medium"}}</span></a>
+  <a class="tile tile-link sev-low" href="{{$base}}/timeline?severity=low"><span class="tile-n">{{index .BySev 1}}</span><span class="tile-l">{{t "low"}}</span></a>
+  <div class="tile sev-info"><span class="tile-n">{{index .BySev 0}}</span><span class="tile-l">{{t "info"}}</span></div>
+</section>
+
+{{if .Imported}}
+<div class="row wrap toolbar">
+  <form method="post" action="{{$base}}/logs/analyze"><button class="btn" type="submit">{{template "icon" "refresh"}}{{t "Analyze again"}}</button></form>
+  {{if .Findings}}<form method="post" action="{{$base}}/logs/indicators"><button class="btn" type="submit">{{template "icon" "plus"}}{{t "Add indicators to the case"}}</button></form>{{end}}
+  <span class="muted small">{{t "Indicators are added without being searched: online sources are queried only when you search them, and internal addresses never."}}</span>
+</div>
+{{end}}
+
+{{range .Findings}}
+<article class="finding {{sevClass .Severity}}">
+  <header class="finding-head">
+    {{template "sev" .Severity}}
+    <h3>{{clean .Title}}</h3>
+    {{with .Technique}}{{$tech := .}}{{with techURL .}}<a class="technique" href="{{.}}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{$tech}}</a>{{else}}<span class="technique">{{$tech}}</span>{{end}}{{end}}
+  </header>
+  <p class="finding-meta muted small">
+    {{utc .First}}{{if ne (utc .First) (utc .Last)}} → {{utc .Last}}{{end}} UTC · {{t "%d events" .Count}}{{with .Host}} · {{t "host"}} {{clean .}}{{end}}{{with .User}} · {{t "user"}} {{clean .}}{{end}}{{with .SrcIP}} · {{t "from"}} <a href="/search?q={{.}}">{{.}}</a>{{end}}
+  </p>
+  <p class="finding-summary">{{clean .Summary}}</p>
+  {{with .Events}}
+  <details class="cited">
+    <summary>{{t "Events that prove it"}}</summary>
+    <ul>
+      {{range .}}<li><time>{{evtime .}}</time> <code>{{clean (baseName .Ref.Path)}}</code> <span class="muted">{{.Ref.Record}}</span><br><span class="small">{{clean .Message}}</span></li>{{end}}
+    </ul>
+  </details>
+  {{end}}
+</article>
+{{else}}
+<section class="card">
+  {{if .Imported}}<p class="muted">{{t "No findings: the detection rules found nothing suspicious in the imported logs."}}</p>
+  {{else}}<p class="muted">{{t "No logs imported yet."}} <a href="{{$base}}/evidence">{{t "Import logs"}}</a>.</p>{{end}}
+</section>
+{{end}}
+{{end}}
+{{end}}

@@ -84,6 +84,7 @@ token created with 'astro token create'. The server listens on localhost only un
 					Keys:    a,
 					Fetcher: datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
 					Version: version,
+					Actor:   actor(""),
 					Secure:  certFile != "",
 					Logger:  logger,
 				})

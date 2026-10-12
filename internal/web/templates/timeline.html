@@ -1,0 +1,77 @@
+{{define "content"}}
+{{with .Data}}{{$base := printf "/cases/%s" .Case.Name}}{{$q := .Query}}
+{{template "case-mini-head" .Case}}
+{{template "case-tabs" (tab .Case.Name "timeline")}}
+
+<form method="get" action="{{$base}}/timeline" class="card filters">
+  <label class="field"><span>{{t "Severity"}}</span>
+    <select name="severity">
+      <option value="">{{t "all"}}</option>
+      <option value="low"{{if eq $q.Severity "low"}} selected{{end}}>{{t "low or higher"}}</option>
+      <option value="medium"{{if eq $q.Severity "medium"}} selected{{end}}>{{t "medium or higher"}}</option>
+      <option value="high"{{if eq $q.Severity "high"}} selected{{end}}>{{t "high or higher"}}</option>
+      <option value="critical"{{if eq $q.Severity "critical"}} selected{{end}}>{{t "critical"}}</option>
+    </select></label>
+  <label class="field"><span>{{t "Host"}}</span><input name="host" value="{{$q.Host}}" maxlength="512"></label>
+  <label class="field"><span>{{t "User"}}</span><input name="user" value="{{$q.User}}" maxlength="512"></label>
+  <label class="field"><span>{{t "IP address"}}</span><input name="ip" value="{{$q.IP}}" maxlength="512" spellcheck="false"></label>
+  <label class="field"><span>{{t "Source"}}</span><input name="source" value="{{$q.Source}}" maxlength="512" placeholder="auth.log"></label>
+  <label class="field"><span>{{t "Event ID"}}</span><input name="event_id" value="{{$q.EventID}}" inputmode="numeric" maxlength="6"></label>
+  <label class="field"><span>{{t "From (UTC)"}}</span><input name="from" value="{{$q.From}}" placeholder="2026-10-11 21:00:00"></label>
+  <label class="field"><span>{{t "To (UTC)"}}</span><input name="to" value="{{$q.To}}" placeholder="2026-10-11 23:59:59"></label>
+  <label class="field field-wide"><span>{{t "Text in message or command"}}</span><input name="q" value="{{$q.Text}}" maxlength="512"></label>
+  <input type="hidden" name="kind" value="{{$q.Kind}}">
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{template "icon" "search"}}{{t "Filter"}}</button>
+    {{if .Filtered}}<a class="btn btn-ghost" href="{{$base}}/timeline">{{t "Reset"}}</a>{{end}}
+    {{if .Total}}<a class="btn" href="{{.CSVURL}}" hx-boost="false" download>{{template "icon" "download"}}{{t "CSV"}}</a>{{end}}
+  </div>
+</form>
+
+{{with .Error}}<div class="flash flash-error">{{t "Invalid filter:"}} {{.}}</div>{{end}}
+
+<section class="card timeline">
+  <header class="card-head">
+    <h2>{{t "%d events" .Total}}</h2>
+    {{if .Events}}<span class="muted small">{{.First}}–{{.Last}} · {{t "times in UTC"}} · <span class="legend">~ {{t "year inferred"}} · ? {{t "time unknown"}}</span></span>{{end}}
+  </header>
+  {{range .Events}}
+  <details class="ev {{sevClass .Severity}}">
+    <summary>
+      <time class="ev-time">{{evtime .}}</time>
+      {{template "sev" .Severity}}
+      <span class="ev-host">{{clean .Host}}</span>
+      <span class="ev-src">{{clean .Source}}</span>
+      <span class="ev-who">{{clean .User}}{{if and .User .SrcIP}} · {{end}}{{.SrcIP}}</span>
+      <span class="ev-msg">{{clean .Message}}</span>
+    </summary>
+    <div class="ev-body">
+      <dl class="fields">
+        <dt>{{t "Kind"}}</dt><dd>{{.Kind}}{{with .EventID}} · {{t "event"}} {{.}}{{end}}{{with .Channel}} · {{clean .}}{{end}}</dd>
+        {{with .Provider}}<dt>{{t "Provider"}}</dt><dd>{{clean .}}</dd>{{end}}
+        {{with .User}}<dt>{{t "User"}}</dt><dd>{{clean .}}</dd>{{end}}
+        {{with .SrcIP}}<dt>{{t "Source IP"}}</dt><dd><a href="/search?q={{.}}">{{.}}</a></dd>{{end}}
+        {{with .DstIP}}<dt>{{t "Destination IP"}}</dt><dd><a href="/search?q={{.}}">{{.}}</a></dd>{{end}}
+        {{with .Process}}<dt>{{t "Process"}}</dt><dd><code>{{clean .}}</code></dd>{{end}}
+        {{with .Parent}}<dt>{{t "Parent"}}</dt><dd><code>{{clean .}}</code></dd>{{end}}
+        {{with .CommandLine}}<dt>{{t "Command line"}}</dt><dd><code class="cmd">{{clean .}}</code></dd>{{end}}
+        {{range $k, $v := .Fields}}<dt>{{clean $k}}</dt><dd>{{clean $v}}</dd>{{end}}
+        <dt>{{t "Evidence"}}</dt><dd><code>{{clean .Ref.Path}}</code> · {{.Ref.Record}}</dd>
+        <dt>SHA-256</dt><dd class="hash"><code>{{.Ref.SHA256}}</code></dd>
+      </dl>
+      {{with .Raw}}<details class="raw"><summary>{{t "Raw"}}</summary><pre>{{clean .}}</pre></details>{{end}}
+    </div>
+  </details>
+  {{else}}
+    {{if .HasEvents}}<p class="muted">{{t "No events match the filter."}}</p>
+    {{else}}<p class="muted">{{t "No events yet."}} <a href="{{$base}}/evidence">{{t "Import logs"}}</a>.</p>{{end}}
+  {{end}}
+  {{if or .PrevURL .NextURL}}
+  <nav class="pager" aria-label="{{t "Pages"}}">
+    {{if .PrevURL}}<a class="btn btn-sm" href="{{.PrevURL}}">← {{t "Previous"}}</a>{{end}}
+    {{if .NextURL}}<a class="btn btn-sm" href="{{.NextURL}}">{{t "Next"}} →</a>{{end}}
+  </nav>
+  {{end}}
+</section>
+{{end}}
+{{end}}

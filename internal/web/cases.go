@@ -83,6 +83,7 @@ type caseData struct {
 	Form       api.SearchOptions
 	TLPs       []string
 	Formats    []string
+	Logs       *logSummary
 }
 
 func (s *server) casePage(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +101,10 @@ func (s *server) casePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := caseData{View: v, Sources: s.Sources(), TLPs: tlpLevels, Formats: report.Formats}
+	if d.Logs, err = s.logSummary(r.Context(), name); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	d.Malicious, d.Suspicious, d.Clean, d.Pending = v.Counts()
 	title := v.Case.Title
 	if title == "" {

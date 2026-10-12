@@ -1,0 +1,62 @@
+{{define "content"}}
+{{with .Data}}{{$base := printf "/cases/%s" .Case.Name}}
+{{template "case-mini-head" .Case}}
+{{template "case-tabs" (tab .Case.Name "evidence")}}
+{{template "import-status" .}}
+
+<section class="card">
+  <header class="card-head"><h2>{{t "Import logs"}}</h2></header>
+  <form method="post" action="{{$base}}/logs/import" class="import-form">
+    <label class="field field-wide"><span>{{t "File or folder on this computer"}}</span>
+      <input name="path" required maxlength="4096" placeholder="/evidence/triage" value="{{.Form.Path}}" autocomplete="off" spellcheck="false"></label>
+    <label class="field"><span>{{t "Time zone of the logs"}}</span>
+      <input name="tz" value="{{.Form.TZ}}" list="zones" autocomplete="off" spellcheck="false"></label>
+    <datalist id="zones"><option value="UTC"><option value="Europe/Rome"><option value="Europe/London"><option value="Europe/Berlin"><option value="America/New_York"><option value="America/Los_Angeles"><option value="Asia/Tokyo"></datalist>
+    <label class="field"><span>{{t "Year of syslog lines"}}</span>
+      <input name="year" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="{{t "from the file date"}}" value="{{.Form.Year}}"></label>
+    <label class="field"><span>{{t "Host name"}}</span>
+      <input name="host" maxlength="255" placeholder="{{t "from the logs"}}" value="{{.Form.Host}}"></label>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">{{template "icon" "download"}}{{t "Import and analyze"}}</button></div>
+  </form>
+  <p class="muted small form-note">{{t "Files are read where they are and never modified: astro keeps their hashes and a chain of custody. Supported: Windows .evtx, auth.log, secure, syslog, wtmp, btmp, utmp, bash and zsh history, web access logs and Docker container logs, also compressed (.gz)."}}</p>
+</section>
+
+<section class="card">
+  <header class="card-head"><h2>{{t "Evidence"}}</h2><span class="muted small">{{t "%d files" (len .Evidence)}}</span></header>
+  {{range .Evidence}}
+  <article class="evidence">
+    <div class="evidence-head">
+      <strong>#{{.ID}} {{.Name}}</strong>
+      <span class="pill">{{.Kind}}</span>{{if .Compressed}} <span class="pill">gzip</span>{{end}}
+      {{if .Verified}}<span class="badge v-clean">{{t "custody verified"}}</span>{{else}}<span class="badge v-malicious">{{t "custody broken"}}</span>{{end}}
+    </div>
+    <p class="path"><code>{{clean .Path}}</code></p>
+    <dl class="fields">
+      <dt>{{t "Size"}}</dt><dd>{{size .Size}}</dd>
+      <dt>{{t "Events"}}</dt><dd>{{.Events}}{{if .ParseErrors}} · <span class="warn">{{t "%d unparsable entries" .ParseErrors}}</span>{{end}}{{if .Truncated}} · <span class="warn">{{t "stopped at the event limit"}}</span>{{end}}</dd>
+      {{if .FirstEvent}}<dt>{{t "Time range"}}</dt><dd>{{utc .FirstEvent}} → {{utc .LastEvent}} UTC</dd>{{end}}
+      {{with .Host}}<dt>{{t "Host"}}</dt><dd>{{clean .}}</dd>{{end}}
+      <dt>{{t "Imported"}}</dt><dd>{{utc .ImportedAt}} UTC</dd>
+      <dt>SHA-256</dt><dd class="hash"><code>{{.SHA256}}</code> <button type="button" class="btn btn-ghost btn-xs" data-copy="{{.SHA256}}">{{t "Copy"}}</button></dd>
+      <dt>SHA-1</dt><dd class="hash"><code>{{.SHA1}}</code></dd>
+      <dt>MD5</dt><dd class="hash"><code>{{.MD5}}</code></dd>
+    </dl>
+    <details class="custody">
+      <summary>{{t "Chain of custody"}} ({{len .Custody}})</summary>
+      <ol>
+        {{range .Custody}}<li><span class="muted small">{{utc .At}} UTC</span> <strong>{{t .Action}}</strong> · {{clean .Actor}}<br><span class="small">{{clean .Detail}}</span></li>{{end}}
+      </ol>
+    </details>
+  </article>
+  {{else}}<p class="muted">{{t "No evidence yet: import a file or a folder above."}}</p>{{end}}
+</section>
+{{end}}
+{{end}}
+
+{{define "import-status"}}{{with .Job}}
+<div id="import-status" class="flash {{if .Running}}flash-warn{{else if .Err}}flash-error{{else}}flash-ok{{end}}" role="status"{{if .Running}} hx-get="/cases/{{$.Case.Name}}/logs/status" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+  {{if .Running}}<span class="spinner" aria-hidden="true"></span> {{t "Importing and analyzing %s, started %s UTC." (clean .Path) (utc .Started)}}
+  {{else if .Err}}{{t "Import of %s failed: %s" (clean .Path) (clean .Err)}}
+  {{else}}{{t "Last import: %d files, %d events, %d findings." .Files .Events .Findings}}{{end}}
+</div>
+{{end}}{{end}}
