@@ -332,6 +332,8 @@ tested, while the commands and views that use them are still to come.
 | ✅ ready | **Detection rules** mapped to MITRE ATT&CK, for Linux, Windows and web logs alike: brute force and password spraying followed by a successful login, new accounts and administrators, persistence (services, scheduled tasks, cron, systemd, SSH keys, Run keys), dangerous commands (reverse shells, download and execute, encoded PowerShell, LOLBins, credential dumping, shadow copy deletion), cleared or truncated logs, DCSync, Kerberoasting and AS-REP roasting, LSASS access, web scanners and exploitation attempts. Each finding cites the events that prove it, and those events take its severity in the timeline. |
 | ✅ ready | **Command line**: `astro logs import`, `timeline`, `findings`, `evidence` and `analyze`, with filters (severity, host, user, address, source, event ID, text, time range), severity colors, CSV and JSON export, and the chain of custody of every file. |
 | ✅ ready | **Web interface**: every case gets Evidence, Timeline and Findings tabs. Logs are imported from a local path in the background; the timeline has filters, pages, rows colored by severity that open on the event details and the raw record, and CSV export; findings link to MITRE ATT&CK and list the events that prove them. In English and Italian. |
+| ✅ ready | **Triage collections (UAC and similar).** Import the whole collection folder: besides the logs, astro reads the filesystem timeline (bodyfile: when each file was created, changed, or first used), the process and connection listings taken on the live system (`ps -ef`, `ss -tanp`) and the commands scheduled in APT hooks, crontabs and systemd units. The time zone of the host is read from `etc/timezone`. Package dates are recognized, so only what changed after the installation stands out. |
+| ✅ ready | **More detection rules**: root logins over telnet, reverse shells and processes running from hidden folders, socat listeners, connections to unusual ports, package manager hooks that start programs, files hidden in `/tmp/.X11-unix`, binaries added to system folders by hand, bulk reads of user folders, and an archive tool followed by a transfer tool (staging and exfiltration). |
 | ✅ ready | **Terminal interface**: in every case, `l` imports logs, `t` opens the timeline (colored by severity, with severity and text filters and the details of each event next to it) and `f` the findings, whose indicators can be added to the case. |
 | 🔜 planned | **Timeline and findings** in the REST API. |
 | 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
@@ -407,12 +409,16 @@ timeline con gli eventi gravi in rosso. Sono già pronti, nel codice e testati,
 la gestione delle prove (lette dove sono, mai copiate né modificate, con hash e
 catena di custodia a prova di modifica) e i parser per auth.log/syslog, wtmp,
 btmp e utmp, la history di bash e zsh, gli access log dei server web e i log
-dei container Docker, compresi i segni di log troncati, e il parser degli
+dei container Docker, compresi i segni di log troncati, le raccolte di triage
+UAC (timeline del filesystem dal bodyfile, processi e connessioni presi sul
+sistema acceso, hook di APT, crontab e unit di systemd, fuso orario letto dalla
+raccolta), e il parser degli
 eventi Windows (EVTX), scritto da zero con la sola libreria standard di Go, che
 legge anche file "sporchi" o danneggiati. Sono pronte anche le regole di
 rilevamento mappate su MITRE ATT&CK (brute force seguito da login, nuovi
-amministratori, persistenza, comandi pericolosi, log cancellati, DCSync,
-Kerberoasting, attacchi web e altro): ogni finding cita gli eventi che lo
+amministratori, login di root via telnet, persistenza, shell inverse, processi
+in cartelle nascoste, archiviazione seguita da trasferimento, comandi
+pericolosi, log cancellati, DCSync, Kerberoasting, attacchi web e altro): ogni finding cita gli eventi che lo
 provano. Si usa già da riga di comando (`astro logs import`, `timeline`, `findings`,
 `evidence`), dall'interfaccia web, con le schede Prove, Timeline e Finding in
 ogni caso, e dalla TUI (`l` importa, `t` timeline, `f` finding); arriveranno la

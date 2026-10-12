@@ -29,7 +29,9 @@ rules. Files are read where they are and never modified: each one is hashed
 
 Supported: Windows event logs (.evtx), auth.log/secure/syslog, wtmp/btmp/utmp,
 bash and zsh history, web access logs and Docker container logs, also
-compressed (.gz). Times are shown in UTC; "~" marks a guessed year and "?" a
+compressed (.gz). From triage collections (UAC and similar) also the
+filesystem timeline (bodyfile), the ps -ef and ss -tanp listings of the live
+system and the commands scheduled in APT hooks, crontabs and systemd units. Times are shown in UTC; "~" marks a guessed year and "?" a
 command without a timestamp.
 
 Analysis is local: nothing is sent to online sources. Indicators found in the
