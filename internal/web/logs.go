@@ -41,6 +41,7 @@ type importJob struct {
 	NotLogs  int // files that are not a supported log format
 	Dupes    int // files already in the case
 	Findings int
+	TimeZone string // zone read from the collection, if any
 	Err      string
 }
 
@@ -272,7 +273,7 @@ func (s *server) runImport(parent context.Context, name, path string, opts evide
 	ctx, cancel := context.WithTimeout(parent, importTimeout)
 	defer cancel()
 	var files, events, skipped, notLogs, dupes, findings int
-	var failure string
+	var failure, zone string
 	defer func() {
 		if v := recover(); v != nil {
 			s.Logger.Error("import panicked", "case", name, "panic", v)
@@ -280,7 +281,7 @@ func (s *server) runImport(parent context.Context, name, path string, opts evide
 		}
 		s.jobs.finish(name, func(j *importJob) {
 			j.Finished, j.Files, j.Events, j.Skipped, j.Findings, j.Err = s.now(), files, events, skipped, findings, failure
-			j.NotLogs, j.Dupes = notLogs, dupes
+			j.NotLogs, j.Dupes, j.TimeZone = notLogs, dupes, zone
 		})
 	}()
 	im := evidence.New(s.Store, evidence.DefaultParsers()...)
@@ -291,6 +292,7 @@ func (s *server) runImport(parent context.Context, name, path string, opts evide
 		return
 	}
 	files, skipped, events = res.Counts()
+	zone = res.TimeZone
 	for _, f := range res.Files {
 		switch {
 		case f.Duplicate:

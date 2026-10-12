@@ -70,6 +70,6 @@
     {{if .Dupes}}{{t "%d files are already in the case." .Dupes}}{{end}}
     {{if .NotLogs}}{{t "%d files are not a supported log format." .NotLogs}}{{end}}
     <br>{{t "In a UAC or similar collection the logs are under [root]/var/log (and [root]/var/lib/docker for containers): upload the whole collection folder. uac.log and the reports in system/, live_response/ or bodyfile/ are not logs."}}</div>
-  {{else}}{{t "Last import: %d files, %d events, %d findings." .Files .Events .Findings}}{{if .Skipped}} {{t "%d other files skipped (not logs or already in the case)." .Skipped}}{{end}}{{end}}
+  {{else}}{{t "Last import: %d files, %d events, %d findings." .Files .Events .Findings}}{{if .Skipped}} {{t "%d other files skipped (not logs or already in the case)." .Skipped}}{{end}}{{if .TimeZone}} {{t "Times without an offset were read in %s, the time zone of the collection." (clean .TimeZone)}}{{end}}{{end}}
 </div>
 {{end}}{{end}}

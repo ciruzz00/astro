@@ -94,6 +94,10 @@ type Result struct {
 	Files []FileResult `json:"files"`
 	// Truncated reports that MaxFiles stopped the walk.
 	Truncated bool `json:"truncated,omitempty"`
+	// TimeZone is the zone read from the collection (etc/timezone) when
+	// none was given, and TimeZoneFrom the file it was read from.
+	TimeZone     string `json:"time_zone,omitempty"`
+	TimeZoneFrom string `json:"time_zone_from,omitempty"`
 }
 
 // Counts returns how many files were imported and skipped, and the events stored.
@@ -127,6 +131,11 @@ func (im *Importer) Import(ctx context.Context, caseName, root string, opts Opti
 		return nil, err
 	}
 	res := &Result{}
+	if opts.Location == nil {
+		if loc, from := collectionZone(abs, info.IsDir()); loc != nil {
+			opts.Location, res.TimeZone, res.TimeZoneFrom = loc, loc.String(), from
+		}
+	}
 	switch {
 	case info.Mode()&fs.ModeSymlink != 0:
 		return nil, fmt.Errorf("%s is a symbolic link: give the path of the file it points to", root)

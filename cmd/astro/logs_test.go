@@ -125,3 +125,31 @@ func TestActorAndTimeFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestLogsImportReadsCollectionZone(t *testing.T) {
+	data, col := t.TempDir(), t.TempDir()
+	for path, content := range map[string]string{
+		"[root]/etc/timezone":     "Europe/Rome\n",
+		"[root]/var/log/auth.log": "Oct 11 23:00:00 web01 sshd[1]: Accepted password for alice from 203.0.113.9 port 4100 ssh2\n",
+	} {
+		p := filepath.Join(col, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := astro(t, data, "case", "new", "inc-tz"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := astro(t, data, "logs", "import", "inc-tz", col, "--year", "2026")
+	if err != nil || !strings.Contains(out, "read in Europe/Rome") {
+		t.Fatalf("import: %v\n%s", err, out)
+	}
+	// 23:00 in Rome (UTC+2 in October) is 21:00 UTC.
+	out, _ = astro(t, data, "logs", "timeline", "inc-tz")
+	if !strings.Contains(out, "2026-10-11 21:00:00") {
+		t.Errorf("timeline not in UTC:\n%s", out)
+	}
+}

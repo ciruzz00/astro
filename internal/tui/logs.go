@@ -146,6 +146,9 @@ func (m *Model) importCmd(name, path string) tea.Cmd {
 			return "", fmt.Errorf("analysis: %w", err)
 		}
 		text := fmt.Sprintf("%d files imported, %d events; %s", files, events, findingCounts(an.Findings))
+		if res.TimeZone != "" {
+			text += "; times read in " + res.TimeZone + " (from the collection)"
+		}
 		if res.Truncated {
 			text += fmt.Sprintf(" (stopped at %d files)", im.MaxFiles)
 		}

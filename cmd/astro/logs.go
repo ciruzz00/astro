@@ -83,7 +83,9 @@ skipped. The detection rules run afterwards unless --no-analyze is given.
 
 Syslog lines carry no year and often no time zone: the year is inferred from
 the file modification time (use --year to force it) and times are read as UTC
-unless --tz names the zone of the host (e.g. Europe/Rome).`,
+unless --tz names the zone of the host (e.g. Europe/Rome). In triage
+collections (UAC and similar) the zone is read from etc/timezone when --tz
+is not given.`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: withApp(g, func(cmd *cobra.Command, a *app, args []string) error {
 			ctx, name := cmd.Context(), args[0]
@@ -105,12 +107,16 @@ unless --tz names the zone of the host (e.g. Europe/Rome).`,
 			im.Actor = actor(who)
 			out, st := cmd.OutOrStdout(), style(cmd.OutOrStdout(), g)
 			var all []evidence.FileResult
+			var zones []string
 			for _, path := range args[1:] {
 				res, err := im.Import(ctx, name, path, opts)
 				if err != nil {
 					return fmt.Errorf("%s: %w", path, err)
 				}
 				all = append(all, res.Files...)
+				if res.TimeZone != "" {
+					zones = append(zones, fmt.Sprintf("%s: times without an offset read in %s, from %s (--tz changes it)", path, res.TimeZone, res.TimeZoneFrom))
+				}
 				if res.Truncated {
 					fmt.Fprintf(cmd.ErrOrStderr(), "%s: stopped at %d files\n", path, im.MaxFiles)
 				}
@@ -132,7 +138,10 @@ unless --tz names the zone of the host (e.g. Europe/Rome).`,
 				added = n
 			}
 			if asJSON {
-				return render.JSON(out, map[string]any{"files": all, "findings": findings, "indicators_added": added})
+				return render.JSON(out, map[string]any{"files": all, "findings": findings, "indicators_added": added, "time_zones": zones})
+			}
+			for _, z := range zones {
+				fmt.Fprintln(out, render.Sanitize(z))
 			}
 			printImport(out, all, showSkipped, st)
 			if !noAnalyze {
