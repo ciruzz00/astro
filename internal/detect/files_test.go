@@ -62,7 +62,16 @@ func TestFileRules(t *testing.T) {
 	for i := range 50 { // music played over an hour
 		lines = append(lines, read(fmt.Sprintf("/home/alice/Music/s%d.mp3", i), at(3*day+i*60)))
 	}
-	got, _ := run(bodyEvents(t, lines))
+	got, res := run(bodyEvents(t, lines))
+	raised := 0
+	for _, id := range got["fs-bulk-read"][0].EventIDs {
+		if res.Raise[id] > logs.Info {
+			raised++
+		}
+	}
+	if raised != 1 {
+		t.Errorf("bulk read raised %d events, want only the first", raised)
+	}
 
 	if x := got["fs-socket-dir-file"]; len(x) != 1 || !strings.Contains(x[0].Summary, "x.py") {
 		t.Errorf("socket folder = %+v", x)

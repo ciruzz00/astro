@@ -105,7 +105,8 @@ func (en *Engine) hit(r Rule, key string, e *logs.Event, example string) *builde
 	if e.ID != 0 && len(b.f.EventIDs) < logs.MaxFindingEvents {
 		b.f.EventIDs = append(b.f.EventIDs, e.ID)
 	}
-	if e.ID != 0 && en.raise[e.ID] < r.Severity {
+	// Rules that cite many routine events (file reads) color only the first.
+	if e.ID != 0 && en.raise[e.ID] < r.Severity && (!quietRules[r.ID] || b.f.Count == 1) {
 		en.raise[e.ID] = r.Severity
 	}
 	example = strings.TrimSpace(strings.ReplaceAll(example, "\n", " "))
@@ -114,6 +115,10 @@ func (en *Engine) hit(r Rule, key string, e *logs.Event, example string) *builde
 	}
 	return b
 }
+
+// quietRules cite many routine events: only their first one takes the
+// severity, so the timeline is not flooded.
+var quietRules = map[string]bool{"fs-bulk-read": true}
 
 // remoteIP is the address a finding is about: the source of a login or
 // request, or the far end of a connection seen on the host.
