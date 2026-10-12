@@ -161,11 +161,17 @@ browser:
 - **Cases**: open a case to search new indicators (`s`) or all again (`S`), add
   indicators (`i`) and notes (`m`), export a report (`e`) or close it (`c`);
   `n` creates a case.
+- **Logs** (in development, see below): in a case, `l` imports a log file or
+  folder, `t` opens the timeline (rows colored by severity, `+`/`-` for the
+  minimum severity, `/` to filter by text, every field of the selected event
+  and the evidence it comes from) and `f` the findings with their ATT&CK
+  technique and proving events.
 - **Sources**: enabled sources and offline datasets; `u` syncs the datasets.
 - `ctrl+o` switches to offline mode, `?` shows every key.
 
 Provider data is stripped of control characters before it reaches the screen,
-so a malicious answer cannot inject terminal escape sequences.
+so a malicious answer cannot inject terminal escape sequences; the same goes
+for log contents.
 
 ## Web interface
 
@@ -326,7 +332,8 @@ tested, while the commands and views that use them are still to come.
 | ✅ ready | **Detection rules** mapped to MITRE ATT&CK, for Linux, Windows and web logs alike: brute force and password spraying followed by a successful login, new accounts and administrators, persistence (services, scheduled tasks, cron, systemd, SSH keys, Run keys), dangerous commands (reverse shells, download and execute, encoded PowerShell, LOLBins, credential dumping, shadow copy deletion), cleared or truncated logs, DCSync, Kerberoasting and AS-REP roasting, LSASS access, web scanners and exploitation attempts. Each finding cites the events that prove it, and those events take its severity in the timeline. |
 | ✅ ready | **Command line**: `astro logs import`, `timeline`, `findings`, `evidence` and `analyze`, with filters (severity, host, user, address, source, event ID, text, time range), severity colors, CSV and JSON export, and the chain of custody of every file. |
 | ✅ ready | **Web interface**: every case gets Evidence, Timeline and Findings tabs. Logs are imported from a local path in the background; the timeline has filters, pages, rows colored by severity that open on the event details and the raw record, and CSV export; findings link to MITRE ATT&CK and list the events that prove them. In English and Italian. |
-| 🔜 planned | **Timeline and findings** in the terminal interface and the REST API. |
+| ✅ ready | **Terminal interface**: in every case, `l` imports logs, `t` opens the timeline (colored by severity, with severity and text filters and the details of each event next to it) and `f` the findings, whose indicators can be added to the case. |
+| 🔜 planned | **Timeline and findings** in the REST API. |
 | 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
 
 ```sh
@@ -407,9 +414,9 @@ rilevamento mappate su MITRE ATT&CK (brute force seguito da login, nuovi
 amministratori, persistenza, comandi pericolosi, log cancellati, DCSync,
 Kerberoasting, attacchi web e altro): ogni finding cita gli eventi che lo
 provano. Si usa già da riga di comando (`astro logs import`, `timeline`, `findings`,
-`evidence`) e dall'interfaccia web, con le schede Prove, Timeline e Finding in
-ogni caso; arriveranno la timeline e i finding nella TUI, nella REST API e nei
-report.
+`evidence`), dall'interfaccia web, con le schede Prove, Timeline e Finding in
+ogni caso, e dalla TUI (`l` importa, `t` timeline, `f` finding); arriveranno la
+timeline e i finding nella REST API e nei report.
 
 ## License
 
