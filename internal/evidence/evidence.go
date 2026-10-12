@@ -66,6 +66,9 @@ type Options struct {
 	Location *time.Location
 	// Host overrides the host name of every event.
 	Host string
+	// Note is added to the first chain of custody entry of every file
+	// (e.g. that it is a copy uploaded through the web interface).
+	Note string
 }
 
 // FileResult is the outcome for one file.
@@ -213,6 +216,9 @@ func (im *Importer) importFile(ctx context.Context, caseID int64, caseName, path
 		Size: sums.size, ModTime: info.ModTime().UTC(), SHA256: sums.sha256, SHA1: sums.sha1, MD5: sums.md5, Host: opts.Host}
 	detail := fmt.Sprintf("read in place; size %d; sha256 %s; sha1 %s; md5 %s; mtime %s",
 		sums.size, sums.sha256, sums.sha1, sums.md5, info.ModTime().UTC().Format(time.RFC3339))
+	if opts.Note != "" {
+		detail += "; " + opts.Note
+	}
 	id, err := im.store.AddEvidence(ctx, caseName, ev, im.Actor, detail, im.now().UTC())
 	if errors.Is(err, store.ErrExists) {
 		r.Duplicate, r.Skipped = true, "already in the case (same SHA-256)"
