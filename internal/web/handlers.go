@@ -1,6 +1,8 @@
 package web
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +17,14 @@ import (
 	"github.com/ciruzz00/astro/internal/store"
 )
 
-// Upload and form limits.
+// Upload and form limits. Text uploads (logs to extract indicators from)
+// may be large; they are streamed and only their indicators are kept.
 const (
-	maxUpload = 8 << 20
-	maxForm   = maxUpload + 1<<20
+	maxUpload     = 8 << 20
+	maxForm       = maxUpload + 1<<20
+	maxTextUpload = 256 << 20
+	maxExtracted  = 10000 // indicators kept from one extraction
+	extractChunk  = 1 << 20
 )
 
 // --- login ---
@@ -66,15 +72,39 @@ func parseForm(w http.ResponseWriter, r *http.Request) error {
 	return r.ParseForm() // #nosec G120 -- body capped by MaxBytesReader above
 }
 
-// formText returns the "text" field plus the content of an uploaded "file".
-func formText(r *http.Request) (string, error) {
-	text := r.FormValue("text")
+// parseTextForm parses a form that may carry a large text file: the body
+// limit and the read deadline are raised for this request only, and the
+// file goes to a temporary file instead of memory.
+func parseTextForm(w http.ResponseWriter, r *http.Request) error {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(10 * time.Minute))
+		r.Body = http.MaxBytesReader(w, r.Body, maxTextUpload+1<<20)
+		err := r.ParseMultipartForm(maxUpload) // #nosec G120 -- body capped by MaxBytesReader above
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			return fmt.Errorf("file larger than %d MB", maxTextUpload>>20)
+		}
+		return err
+	}
+	return parseForm(w, r)
+}
+
+// formFile returns the uploaded "file", or nil when there is none.
+func formFile(r *http.Request) (io.ReadCloser, error) {
 	f, _, err := r.FormFile("file")
 	if errors.Is(err, http.ErrMissingFile) || errors.Is(err, http.ErrNotMultipart) {
-		return text, nil
+		return nil, nil
 	}
-	if err != nil {
-		return "", err
+	return f, err
+}
+
+// formText returns the "text" field plus the content of an uploaded "file"
+// (up to maxUpload: for one indicator per line).
+func formText(r *http.Request) (string, error) {
+	text := r.FormValue("text")
+	f, err := formFile(r)
+	if f == nil || err != nil {
+		return text, err
 	}
 	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, maxUpload+1))
@@ -82,9 +112,85 @@ func formText(r *http.Request) (string, error) {
 		return "", err
 	}
 	if len(b) > maxUpload {
-		return "", fmt.Errorf("file larger than %d MB", maxUpload>>20)
+		return "", fmt.Errorf("a list of indicators is limited to %d MB: use \"extract from text\" for logs", maxUpload>>20)
 	}
 	return text + "\n" + string(b), nil
+}
+
+// extractAll extracts every indicator of text: ioc.Extract stops at
+// ioc.MaxExtract, so a text that reaches the cap is split in two (at a line
+// break) until each part fits. emit returns false to stop.
+func extractAll(text string, emit func([]ioc.Indicator) bool) bool {
+	inds := ioc.Extract(text)
+	if len(inds) < ioc.MaxExtract {
+		return emit(inds)
+	}
+	half := len(text) / 2
+	cut := strings.LastIndexByte(text[:half], '\n') + 1
+	if cut == 0 {
+		i := strings.IndexByte(text[half:], '\n')
+		if i < 0 { // one huge line: keep what Extract returned
+			return emit(inds)
+		}
+		cut = half + i + 1
+	}
+	if cut >= len(text) {
+		return emit(inds)
+	}
+	return extractAll(text[:cut], emit) && extractAll(text[cut:], emit)
+}
+
+// extractForm extracts the indicators of the "text" field and of an
+// uploaded "file", reading the file in chunks so large logs fit. It keeps
+// the first maxExtracted distinct indicators and reports if there were more.
+func extractForm(r *http.Request) ([]ioc.Indicator, bool, error) {
+	seen := map[ioc.Indicator]bool{}
+	var out []ioc.Indicator
+	more := false
+	add := func(text string) {
+		extractAll(text, func(inds []ioc.Indicator) bool {
+			for _, i := range inds {
+				if seen[i] {
+					continue
+				}
+				if len(out) >= maxExtracted {
+					more = true
+					return false
+				}
+				seen[i] = true
+				out = append(out, i)
+			}
+			return true
+		})
+	}
+	add(r.FormValue("text"))
+	f, err := formFile(r)
+	if f == nil || err != nil {
+		return out, more, err
+	}
+	defer f.Close()
+	br := bufio.NewReaderSize(f, extractChunk)
+	var carry []byte
+	buf := make([]byte, extractChunk)
+	for !more {
+		n, err := io.ReadFull(br, buf)
+		chunk := append(carry, buf[:n]...)
+		carry = nil
+		if err == nil { // cut at the last newline; the rest joins the next chunk
+			if i := bytes.LastIndexByte(chunk, '\n'); i >= 0 && i < len(chunk)-1 {
+				carry = append([]byte(nil), chunk[i+1:]...)
+				chunk = chunk[:i+1]
+			}
+		}
+		add(string(chunk))
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			break
+		}
+		if err != nil {
+			return out, more, err
+		}
+	}
+	return out, more, nil
 }
 
 // formOptions reads the source selection fields.
@@ -101,14 +207,17 @@ func (s *server) formOptions(r *http.Request) (engine.SearchOptions, api.SearchO
 // formIndicators reads indicators: one per line ("list" mode) or extracted
 // from free text and uploaded files ("text" mode).
 func formIndicators(r *http.Request) ([]ioc.Indicator, error) {
-	text, err := formText(r)
-	if err != nil {
-		return nil, err
-	}
 	var inds []ioc.Indicator
 	if r.FormValue("mode") == "text" {
-		inds = ioc.Extract(text)
+		var err error
+		if inds, _, err = extractForm(r); err != nil {
+			return nil, err
+		}
 	} else {
+		text, err := formText(r)
+		if err != nil {
+			return nil, err
+		}
 		var lines []string
 		for _, l := range strings.Split(text, "\n") {
 			if l = strings.TrimSpace(l); l != "" {
@@ -260,6 +369,8 @@ type extractData struct {
 	Cases      []store.CaseSummary
 	Searched   bool
 	Error      string
+	Truncated  bool
+	Limit      int
 }
 
 func (s *server) extractPage(w http.ResponseWriter, r *http.Request) {
@@ -268,19 +379,24 @@ func (s *server) extractPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) extractPost(w http.ResponseWriter, r *http.Request) {
 	d := extractData{Cases: s.openCases(r), Searched: true}
-	if err := parseForm(w, r); err != nil {
+	if err := parseTextForm(w, r); err != nil {
 		d.Error = s.tr(r, "Invalid form: %s", err.Error())
 		s.render(w, r, http.StatusBadRequest, "extract", "Extract", "extract", d)
 		return
 	}
-	text, err := formText(r)
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
+	inds, more, err := extractForm(r)
 	if err != nil {
 		d.Error = err.Error()
 		s.render(w, r, http.StatusBadRequest, "extract", "Extract", "extract", d)
 		return
 	}
 	d.Text = r.FormValue("text")
-	d.Indicators = ioc.Extract(text)
+	d.Indicators, d.Truncated, d.Limit = inds, more, maxExtracted
 	s.render(w, r, http.StatusOK, "extract", "Extract", "extract", d)
 }
 

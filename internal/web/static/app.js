@@ -33,6 +33,21 @@
     if (q) { ev.preventDefault(); q.focus(); }
   });
 
+  // Log uploads: browsers do not send file dates, and syslog lines have no
+  // year (astro infers it from the file date). Send the dates alongside.
+  document.addEventListener("submit", function (ev) {
+    var form = ev.target;
+    if (!form.matches || !form.matches("form[data-upload-dates]")) { return; }
+    var dates = {};
+    form.querySelectorAll('input[type="file"]').forEach(function (input) {
+      Array.prototype.forEach.call(input.files || [], function (f) {
+        dates[f.webkitRelativePath || f.name] = f.lastModified;
+      });
+    });
+    var field = form.querySelector('input[name="dates"]');
+    if (field) { field.value = JSON.stringify(dates); }
+  });
+
   // "Select all" checkboxes: data-check-all="<name of the item checkboxes>".
   document.addEventListener("change", function (ev) {
     var all = ev.target.closest("[data-check-all]");

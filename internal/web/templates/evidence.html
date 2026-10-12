@@ -6,7 +6,8 @@
 
 <section class="card">
   <header class="card-head"><h2>{{t "Import logs"}}</h2></header>
-  <form method="post" action="{{$base}}/logs/import" class="import-form" enctype="multipart/form-data" hx-boost="false">
+  <form method="post" action="{{$base}}/logs/import" class="import-form" enctype="multipart/form-data" hx-boost="false" data-upload-dates>
+    <input type="hidden" name="dates" value="">
     <div class="field field-wide">
       <span>{{t "Upload from this computer"}}</span>
       <div class="upload-pick">
@@ -26,7 +27,7 @@
     <div class="form-actions"><button class="btn btn-primary" type="submit">{{template "icon" "download"}}{{t "Import and analyze"}}</button></div>
   </form>
   <p class="muted small form-note">{{t "Files are read where they are and never modified: astro keeps their hashes and a chain of custody. Supported: Windows .evtx, auth.log, secure, syslog, wtmp, btmp, utmp, bash and zsh history, web access logs and Docker container logs, also compressed (.gz)."}}</p>
-  <p class="muted small form-note">{{t "Uploaded files are copied into the astro data folder (the hashes are those of their content, so they match the originals); a path is read in place. When astro runs in Docker it only sees its own folders: upload the files instead."}}</p>
+  <p class="muted small form-note">{{t "Uploaded files are copied into the astro data folder (the hashes are those of their content, so they match the originals); a path is read in place. When astro runs in Docker it only sees its own folders: upload the files instead."}} {{t "Syslog lines have no year: astro takes it from the file dates, which the browser sends along with the upload; if the logs are older than a year and the dates are lost, set the year."}}</p>
 </section>
 
 <section class="card">
@@ -62,9 +63,13 @@
 {{end}}
 
 {{define "import-status"}}{{with .Job}}
-<div id="import-status" class="flash {{if .Running}}flash-warn{{else if .Err}}flash-error{{else}}flash-ok{{end}}" role="status"{{if .Running}} hx-get="/cases/{{$.Case.Name}}/logs/status" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
-  {{if .Running}}<span class="spinner" aria-hidden="true"></span> {{t "Importing and analyzing %s, started %s UTC." (clean .Path) (utc .Started)}}
+<div id="import-status" class="flash import-status {{if .Running}}flash-info{{else if .Err}}flash-error{{else if not .Files}}flash-warn{{else}}flash-ok{{end}}" role="status"{{if .Running}} hx-get="/cases/{{$.Case.Name}}/logs/status" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+  {{if .Running}}<span class="spinner" aria-hidden="true"></span> {{t "Importing and analyzing %s, started %s UTC: the page refreshes when it is done." (clean .Path) (utc .Started)}}
   {{else if .Err}}{{t "Import of %s failed: %s" (clean .Path) (clean .Err)}}
-  {{else}}{{t "Last import: %d files, %d events, %d findings." .Files .Events .Findings}}{{end}}
+  {{else if not .Files}}<div><strong>{{t "No log recognized."}}</strong>
+    {{if .Dupes}}{{t "%d files are already in the case." .Dupes}}{{end}}
+    {{if .NotLogs}}{{t "%d files are not a supported log format." .NotLogs}}{{end}}
+    <br>{{t "In a UAC or similar collection the logs are under [root]/var/log (and [root]/var/lib/docker for containers): upload the whole collection folder. uac.log and the reports in system/, live_response/ or bodyfile/ are not logs."}}</div>
+  {{else}}{{t "Last import: %d files, %d events, %d findings." .Files .Events .Findings}}{{if .Skipped}} {{t "%d other files skipped (not logs or already in the case)." .Skipped}}{{end}}{{end}}
 </div>
 {{end}}{{end}}

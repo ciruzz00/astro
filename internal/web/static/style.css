@@ -441,6 +441,8 @@ body.public { min-height: 100vh; background:
 .custody li { overflow-wrap: anywhere; }
 
 #import-status { margin-bottom: 1rem; }
+.flash-info { background: var(--info-bg); color: var(--info); border-color: var(--info-line); }
+.import-status div { font-weight: 400; }
 .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

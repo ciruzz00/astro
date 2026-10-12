@@ -120,10 +120,15 @@ func (s *server) caseAction(w http.ResponseWriter, r *http.Request, anchor strin
 	if !ok {
 		return
 	}
-	if err := parseForm(w, r); err != nil {
+	if err := parseTextForm(w, r); err != nil {
 		s.flashRedirect(w, r, caseURL(name), "error", s.tr(r, "Invalid form: %s", err.Error()))
 		return
 	}
+	defer func() {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
+	}()
 	msg, err := fn(name)
 	if err != nil {
 		s.flashRedirect(w, r, caseURL(name)+anchor, "error", caseMessage(name, err))

@@ -38,6 +38,8 @@ type importJob struct {
 	Files    int
 	Events   int
 	Skipped  int
+	NotLogs  int // files that are not a supported log format
+	Dupes    int // files already in the case
 	Findings int
 	Err      string
 }
@@ -262,14 +264,14 @@ func (s *server) importLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	// The import outlives the request: keep its values, drop its cancellation.
 	go s.runImport(context.WithoutCancel(r.Context()), name, path, opts)
-	s.flashRedirect(w, r, back, "ok", "Import started: the page refreshes when it is done.")
+	redirect(w, r, back) // the status banner follows the import
 }
 
 // runImport imports and analyzes in the background.
 func (s *server) runImport(parent context.Context, name, path string, opts evidence.Options) {
 	ctx, cancel := context.WithTimeout(parent, importTimeout)
 	defer cancel()
-	var files, events, skipped, findings int
+	var files, events, skipped, notLogs, dupes, findings int
 	var failure string
 	defer func() {
 		if v := recover(); v != nil {
@@ -278,6 +280,7 @@ func (s *server) runImport(parent context.Context, name, path string, opts evide
 		}
 		s.jobs.finish(name, func(j *importJob) {
 			j.Finished, j.Files, j.Events, j.Skipped, j.Findings, j.Err = s.now(), files, events, skipped, findings, failure
+			j.NotLogs, j.Dupes = notLogs, dupes
 		})
 	}()
 	im := evidence.New(s.Store, evidence.DefaultParsers()...)
@@ -288,6 +291,14 @@ func (s *server) runImport(parent context.Context, name, path string, opts evide
 		return
 	}
 	files, skipped, events = res.Counts()
+	for _, f := range res.Files {
+		switch {
+		case f.Duplicate:
+			dupes++
+		case f.Skipped == "not a recognized log format":
+			notLogs++
+		}
+	}
 	out, err := detect.Analyze(ctx, s.Store, name, s.now().UTC())
 	if err != nil {
 		failure = "analysis: " + err.Error()

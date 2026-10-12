@@ -17,6 +17,7 @@
 {{if .Searched}}
 <section class="card">
   <header class="card-head"><h2>{{t "%d indicators found" (len .Indicators)}}</h2></header>
+  {{if .Truncated}}<p class="flash flash-warn">{{t "Only the first %d distinct indicators are shown: extract smaller parts of the file to see the rest." .Limit}}</p>{{end}}
   {{if .Indicators}}
   <form method="post" action="/search">
     <input type="hidden" name="mode" value="list">

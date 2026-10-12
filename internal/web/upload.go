@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,8 +16,9 @@ import (
 // Limits on what the browser may upload in one import.
 const (
 	maxUploadBytes = 8 << 30
-	maxUploadFiles = 20000
+	maxUploadFiles = 100000
 	maxFieldBytes  = 4 << 10
+	maxDatesBytes  = 16 << 20 // JSON of the file dates of a large folder
 	uploadDeadline = time.Hour
 )
 
@@ -70,9 +72,11 @@ func (s *server) receiveUpload(w http.ResponseWriter, r *http.Request, caseName 
 		}
 	}()
 	up.fields = map[string]string{}
+	var saved []string
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {
+			applyDates(root, saved, up.fields["dates"])
 			return up, nil
 		}
 		if err != nil {
@@ -83,7 +87,11 @@ func (s *server) receiveUpload(w http.ResponseWriter, r *http.Request, caseName 
 			return up, err
 		}
 		if part.FileName() == "" {
-			b, err := io.ReadAll(io.LimitReader(part, maxFieldBytes))
+			limit := int64(maxFieldBytes)
+			if part.FormName() == "dates" {
+				limit = maxDatesBytes
+			}
+			b, err := io.ReadAll(io.LimitReader(part, limit))
 			if err != nil {
 				return up, err
 			}
@@ -100,7 +108,32 @@ func (s *server) receiveUpload(w http.ResponseWriter, r *http.Request, caseName 
 		if err := saveUpload(root, rel, part); err != nil {
 			return up, err
 		}
+		saved = append(saved, rel)
 		up.files++
+	}
+}
+
+// applyDates gives the saved copies the modification times the browser
+// reported (JSON: relative name → milliseconds since 1970), so the year of
+// syslog lines is inferred from the original dates, not the upload time.
+func applyDates(root *os.Root, saved []string, raw string) {
+	if raw == "" {
+		return
+	}
+	var dates map[string]int64
+	if json.Unmarshal([]byte(raw), &dates) != nil {
+		return
+	}
+	byPath := make(map[string]time.Time, len(dates))
+	for name, ms := range dates {
+		if rel := cleanUploadName(name); rel != "" && ms > 0 {
+			byPath[rel] = time.UnixMilli(ms)
+		}
+	}
+	for _, rel := range saved {
+		if t, ok := byPath[rel]; ok {
+			_ = root.Chtimes(rel, t, t)
+		}
 	}
 }
 
@@ -112,8 +145,13 @@ func uploadPath(disposition string) string {
 	if err != nil {
 		return ""
 	}
+	return cleanUploadName(params["filename"])
+}
+
+// cleanUploadName turns a name sent by a browser into a safe relative path.
+func cleanUploadName(name string) string {
 	var parts []string
-	for _, p := range strings.FieldsFunc(params["filename"], func(r rune) bool { return r == '/' || r == '\\' }) {
+	for _, p := range strings.FieldsFunc(name, func(r rune) bool { return r == '/' || r == '\\' }) {
 		p = strings.TrimSpace(p)
 		if p == "" || p == "." || p == ".." || strings.ContainsRune(p, 0) || strings.Contains(p, ":") {
 			continue

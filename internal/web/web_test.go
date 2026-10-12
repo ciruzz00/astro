@@ -488,7 +488,7 @@ func TestLogAnalysisPages(t *testing.T) {
 	}
 
 	_, body := e.do(t, "POST", "/cases/inc-logs/logs/import", url.Values{"path": {dir}, "tz": {"UTC"}})
-	if !strings.Contains(body, "Import started") {
+	if !strings.Contains(body, `id="import-status"`) {
 		t.Fatalf("import not started:\n%s", body)
 	}
 	deadline := time.Now().Add(10 * time.Second)
@@ -587,7 +587,7 @@ func TestLogUpload(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(page), "Import started") {
+	if !strings.Contains(string(page), `id="import-status"`) {
 		t.Fatalf("upload not started:\n%s", page)
 	}
 	deadline := time.Now().Add(10 * time.Second)
@@ -657,5 +657,142 @@ func TestUploadPath(t *testing.T) {
 		if got := uploadPath(in); got != want {
 			t.Errorf("uploadPath(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestUploadOfNonLogsIsExplained(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	e.do(t, "POST", "/cases", url.Values{"name": {"inc-nl"}, "tlp": {"AMBER"}})
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	for _, name := range []string{"system/suid.txt", "system/getcap.txt"} {
+		w, _ := mw.CreateFormFile("files", name)
+		_, _ = w.Write([]byte("/usr/bin/passwd\n"))
+	}
+	_ = mw.Close()
+	req, _ := http.NewRequest("POST", e.srv.URL+"/cases/inc-nl/logs/import", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if resp, err := e.client.Do(req); err != nil {
+		t.Fatal(err)
+	} else {
+		resp.Body.Close()
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, status := e.do(t, "GET", "/cases/inc-nl/logs/status", nil)
+		if strings.Contains(status, "No log recognized.") {
+			if !strings.Contains(status, "2 files are not a supported log format.") || !strings.Contains(status, "flash-warn") {
+				t.Errorf("status does not explain: %s", status)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no explanation: %s", status)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestExtractLargeFile(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	w, _ := mw.CreateFormFile("file", "big.log")
+	line := strings.Repeat("padding ", 100) + "\n"
+	for range 12 << 20 / len(line) { // ~12 MB, over the old 8 MB limit
+		_, _ = w.Write([]byte(line))
+	}
+	_, _ = w.Write([]byte("beacon to hxxp://evil[.]example[.]com from 203.0.113.9\n"))
+	_ = mw.Close()
+	req, _ := http.NewRequest("POST", e.srv.URL+"/extract", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := e.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(page), "203[.]0[.]113[.]9") || !strings.Contains(string(page), "evil[.]example[.]com") {
+		t.Errorf("extract of a 12 MB file: %d", resp.StatusCode)
+	}
+}
+
+func TestExtractFormChunksAndCaps(t *testing.T) {
+	var b strings.Builder
+	for i := range maxExtracted + 50 {
+		fmt.Fprintf(&b, "host%d.example.com\n", i)
+	}
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	w, _ := mw.CreateFormFile("file", "hosts.txt")
+	_, _ = w.Write([]byte(b.String()))
+	_ = mw.Close()
+	req := httptest.NewRequest("POST", "/extract", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if err := req.ParseMultipartForm(1 << 20); err != nil {
+		t.Fatal(err)
+	}
+	inds, more, err := extractForm(req)
+	if err != nil || len(inds) != maxExtracted || !more || inds[0].Value != "host0.example.com" {
+		t.Errorf("extractForm = %d indicators, more=%v, err=%v", len(inds), more, err)
+	}
+}
+
+func TestExtractAllSplitsWithoutBreakingLines(t *testing.T) {
+	var b strings.Builder
+	for i := range ioc.MaxExtract*2 + 7 {
+		fmt.Fprintf(&b, "10.%d.%d.%d\n", i/65536%256, i/256%256, i%256)
+	}
+	b.WriteString(strings.Repeat("x", 100)) // last line without a newline
+	got := map[ioc.Indicator]bool{}
+	extractAll(b.String(), func(inds []ioc.Indicator) bool {
+		for _, i := range inds {
+			got[i] = true
+		}
+		return true
+	})
+	if len(got) != ioc.MaxExtract*2+7 {
+		t.Errorf("extractAll found %d distinct indicators, want %d", len(got), ioc.MaxExtract*2+7)
+	}
+}
+
+func TestUploadKeepsFileDates(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	e.do(t, "POST", "/cases", url.Values{"name": {"inc-dates"}, "tlp": {"AMBER"}})
+	old := time.Date(2024, 10, 12, 8, 0, 0, 0, time.UTC)
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	_ = mw.WriteField("dates", fmt.Sprintf(`{"triage/auth.log": %d}`, old.UnixMilli()))
+	w, _ := mw.CreateFormFile("files", "triage/auth.log")
+	_, _ = w.Write([]byte("Oct 11 21:00:01 web01 sshd[1]: Accepted password for root from 203.0.113.9 port 4100 ssh2\n"))
+	_ = mw.Close()
+	req, _ := http.NewRequest("POST", e.srv.URL+"/cases/inc-dates/logs/import", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if resp, err := e.client.Do(req); err != nil {
+		t.Fatal(err)
+	} else {
+		resp.Body.Close()
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, status := e.do(t, "GET", "/cases/inc-dates/logs/status", nil)
+		if strings.Contains(status, "Last import: 1 files") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("import did not finish: %s", status)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	evs, _, err := e.store.Events(context.Background(), "inc-dates", store.EventFilter{})
+	if err != nil || len(evs) != 1 || evs[0].Time.Year() != 2024 {
+		t.Fatalf("event year from the uploaded file date = %+v, %v", evs, err)
+	}
+	ev, _ := e.store.CaseEvidence(context.Background(), "inc-dates")
+	if len(ev) != 1 || !ev[0].ModTime.Equal(old) {
+		t.Errorf("stored copy mtime = %v, want %v", ev[0].ModTime, old)
 	}
 }
