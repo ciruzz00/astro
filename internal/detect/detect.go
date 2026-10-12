@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ciruzz00/astro/internal/logs"
+	"github.com/ciruzz00/astro/internal/logs/live"
 )
 
 // Rule identifies what a finding is about.
@@ -87,7 +88,7 @@ func (en *Engine) hit(r Rule, key string, e *logs.Event, example string) *builde
 	b := en.findings[id]
 	if b == nil {
 		b = &builder{f: logs.Finding{RuleID: r.ID, Title: r.Title, Severity: r.Severity, Technique: r.Technique,
-			First: e.Time, Host: e.Host, User: e.User, SrcIP: e.SrcIP}}
+			First: e.Time, Host: e.Host, User: e.User, SrcIP: remoteIP(e)}}
 		en.findings[id] = b
 		en.order = append(en.order, id)
 	}
@@ -99,7 +100,7 @@ func (en *Engine) hit(r Rule, key string, e *logs.Event, example string) *builde
 		b.f.Last = e.Time
 	}
 	if b.f.SrcIP == "" {
-		b.f.SrcIP = e.SrcIP
+		b.f.SrcIP = remoteIP(e)
 	}
 	if e.ID != 0 && len(b.f.EventIDs) < logs.MaxFindingEvents {
 		b.f.EventIDs = append(b.f.EventIDs, e.ID)
@@ -112,6 +113,15 @@ func (en *Engine) hit(r Rule, key string, e *logs.Event, example string) *builde
 		b.examples = append(b.examples, logs.Truncate(example, 300))
 	}
 	return b
+}
+
+// remoteIP is the address a finding is about: the source of a login or
+// request, or the far end of a connection seen on the host.
+func remoteIP(e *logs.Event) string {
+	if e.SrcIP == "" && e.Kind == live.KindSocket {
+		return e.DstIP
+	}
+	return e.SrcIP
 }
 
 func contains(list []string, s string) bool {

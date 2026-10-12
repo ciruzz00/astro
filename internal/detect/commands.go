@@ -24,7 +24,7 @@ func cmd(id, title string, sev logs.Severity, technique, pattern string) command
 var commandRules = []commandRule{
 	// Execution and command and control.
 	cmd("cmd-reverse-shell", "Reverse shell", logs.Critical, "T1059.004",
-		`(?i)(/dev/(tcp|udp)/[^/\s]+/\d+|\b(nc|ncat|netcat)\b[^|;]*\s-[a-z]*[ec]\s|\bsh\s+-i\s*[>&]|bash\s+-i\s*>&|mkfifo\s+\S+.*\b(nc|ncat|sh)\b|socat\b[^|;]*exec:|python[23]?\s+-c\s+['"].*socket.*(subprocess|pty)|php\s+-r\s+['"].*fsockopen|perl\s+-e\s+['"].*socket)`),
+		`(?i)(/dev/(tcp|udp)/[^/\s]+/\d+|\b(nc|ncat|netcat)\b[^|;]*\s-[a-z]*[ec]\s|\bsh\s+-i\s*[>&]|bash\s+-i\s*>&|mkfifo\s+\S+.*\b(nc|ncat|sh)\b|socat\b[^|;]*\btcp[46]?:[^|;]*\b(exec|system):|socat\b[^|;]*\b(exec|system):[^|;]*\btcp[46]?:|python[23]?\s+-c\s+['"].*socket.*(subprocess|pty)|php\s+-r\s+['"].*fsockopen|perl\s+-e\s+['"].*socket)`),
 	cmd("cmd-download-exec", "Download piped to a shell", logs.High, "T1105",
 		`(?i)\b(curl|wget|fetch)\b[^|;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b`),
 	cmd("cmd-download-tmp", "Download to a temporary directory", logs.Medium, "T1105",

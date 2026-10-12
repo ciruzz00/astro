@@ -50,8 +50,9 @@ var (
 		{regexp.MustCompile(`^/(usr/)?s?bin/[^/]+$`), Rule{"fs-system-binary", "File added to a system binary folder outside the package manager", logs.High, "T1036.005"}},
 	}
 
-	reArchiveTool  = regexp.MustCompile(`^/(usr/)?(local/)?bin/(zip|7z|7za|7zr|rar|tar)$`)
-	reTransferTool = regexp.MustCompile(`^/(usr/)?(local/)?bin/(curl|wget|scp|sftp|nc|ncat|netcat|socat|rsync|rclone|ftp|lftp|smbclient)$`)
+	// tar is left out: system jobs (backups, package tools) run it daily.
+	reArchiveTool  = regexp.MustCompile(`^/(usr/)?(local/)?bin/(zip|7z|7za|7zr|rar)$`)
+	reTransferTool = regexp.MustCompile(`^/(usr/)?(local/)?bin/(curl|wget|scp|sftp|nc|ncat|netcat|rsync|rclone|ftp|lftp|smbclient)$`)
 	reTempPlace    = regexp.MustCompile(`^/(tmp|var/tmp|dev/shm)/`)
 	reUserData     = regexp.MustCompile(`^/(home/[^/]+|root|srv|var/www)/`)
 )
@@ -74,7 +75,7 @@ var usualHidden = map[string]bool{
 type fileRules struct {
 	installed   time.Time // birth of the root folders (zero until seen)
 	archive     *logs.Event
-	staging     *builder
+	staging     map[string]*builder // by host and archive use
 	bulk        map[string]*bulkState
 	persistence map[string]bool
 }
@@ -85,7 +86,9 @@ type bulkState struct {
 	b       *builder
 }
 
-func newFileRules() *fileRules { return &fileRules{bulk: map[string]*bulkState{}} }
+func newFileRules() *fileRules {
+	return &fileRules{bulk: map[string]*bulkState{}, staging: map[string]*builder{}}
+}
 
 func isFileEvent(e *logs.Event) bool {
 	switch e.Kind {
@@ -147,14 +150,17 @@ func (r *fileRules) tools(e *logs.Event, en *Engine) {
 		r.archive = &ev
 	case reTransferTool.MatchString(p) && r.archive != nil && e.Time.Sub(r.archive.Time) <= stagingWindow:
 		archive, transfer := *r.archive, *e
-		if r.staging == nil {
-			r.staging = en.hit(ruleStaging, strings.ToLower(e.Host), &archive, "")
-			r.staging.detail = func(b *builder) string {
+		// Each archive use and the transfers after it make one episode.
+		key := strings.ToLower(e.Host) + "|" + archive.Time.String()
+		if r.staging[key] == nil {
+			b := en.hit(ruleStaging, key, &archive, "")
+			r.staging[key] = b
+			b.detail = func(*builder) string {
 				return fmt.Sprintf("%s was first used at %s and %s %s later: data is often packed and then sent out this way.",
 					path.Base(archive.Fields["path"]), archive.Time.Format(time.DateTime), path.Base(transfer.Fields["path"]), transfer.Time.Sub(archive.Time).Round(time.Second))
 			}
 		}
-		en.hit(ruleStaging, strings.ToLower(e.Host), e, "")
+		en.hit(ruleStaging, key, e, "")
 	}
 }
 
