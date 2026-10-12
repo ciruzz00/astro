@@ -36,7 +36,7 @@ var (
 
 func newCorrelations() []stateful {
 	return []stateful{&authCorrelation{sources: map[string]*authSource{}}, &kerberoast{accounts: map[string]*roastState{}},
-		&webBurst{clients: map[string]*burstState{}}}
+		&webBurst{clients: map[string]*burstState{}}, newFileRules()}
 }
 
 // authCorrelation follows failed and successful logins per source.
