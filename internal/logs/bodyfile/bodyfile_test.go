@@ -86,6 +86,21 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestPackageDatesBeforeInstallAreSkipped(t *testing.T) {
+	in := "0|/|2|drwxr-xr-x|0|0|4096|1775600000|1775400000|1775400000|1775400000\n" +
+		// A package file: content from 2021, installed with the system.
+		"0|/usr/bin/tool|9|-rwxr-xr-x|0|0|10|1775500000|1620000000|1775400000|1775400000\n"
+	evs, _ := parse(t, in, logs.Options{})
+	for _, e := range evs {
+		if e.Time.Unix() < 1775400000-86400 {
+			t.Errorf("package date kept: %+v", e)
+		}
+	}
+	if len(evs) != 3 || evs[1].Fields["mtime"] != "1620000000" {
+		t.Errorf("events = %d, second %+v", len(evs), evs[1])
+	}
+}
+
 func TestLimit(t *testing.T) {
 	evs, st := parse(t, sample, logs.Options{MaxEvents: 2})
 	if len(evs) != 2 || !st.Truncated {

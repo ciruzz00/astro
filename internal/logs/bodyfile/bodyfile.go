@@ -98,9 +98,17 @@ func pseudo(name string) bool {
 // maxTime rejects times past 2200 (corrupt entries).
 const maxTime = 7258118400
 
-// Parse implements logs.Parser.
+// installSlack keeps times a little older than the root folder: clocks are
+// often fixed during the installation.
+const installSlack = 24 * 60 * 60
+
+// Parse implements logs.Parser. Package files keep the dates of the package
+// (years before the system existed): when the root folder is listed, times
+// older than its creation are left out of the timeline. They stay in the
+// original record (Raw) of the events that are kept.
 func (p *Parser) Parse(ctx context.Context, r io.Reader, opts logs.Options, emit func(*logs.Event) error) (logs.Stats, error) {
 	var st logs.Stats
+	var floor int64
 	long, err := logs.ScanLines(ctx, r, logs.MaxLine, func(n int, line string) error {
 		line = strings.TrimRight(line, "\r")
 		if strings.TrimSpace(line) == "" {
@@ -114,7 +122,10 @@ func (p *Parser) Parse(ctx context.Context, r io.Reader, opts logs.Options, emit
 		if pseudo(e.Name) {
 			return nil
 		}
-		for _, ev := range events(e, n, opts) {
+		if e.Name == "/" && e.Crtime > installSlack && floor == 0 {
+			floor = e.Crtime - installSlack
+		}
+		for _, ev := range events(e, n, opts, floor) {
 			if opts.MaxEvents > 0 && st.Events >= opts.MaxEvents {
 				st.Truncated = true
 				return logs.ErrLimit
@@ -134,10 +145,10 @@ func (p *Parser) Parse(ctx context.Context, r io.Reader, opts logs.Options, emit
 }
 
 // events groups the times of an entry: one event per distinct time.
-func events(e Entry, n int, opts logs.Options) []*logs.Event {
+func events(e Entry, n int, opts logs.Options, floor int64) []*logs.Event {
 	letters := map[int64][]byte{}
 	for i, t := range []int64{e.Mtime, e.Atime, e.Ctime, e.Crtime} {
-		if t <= 0 || t > maxTime {
+		if t <= 0 || t > maxTime || t < floor {
 			continue
 		}
 		if letters[t] == nil {
