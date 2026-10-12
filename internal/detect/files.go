@@ -89,11 +89,10 @@ var plainHiddenNames = map[string]bool{".lock": true, ".dockerenv": true, ".keep
 
 // fileRules follow filesystem events.
 type fileRules struct {
-	installed   time.Time // birth of the root folders (zero until seen)
-	archive     *logs.Event
-	staging     map[string]*builder // by host and archive use
-	bulk        map[string]*bulkState
-	persistence map[string]bool
+	installed time.Time // birth of the root folders (zero until seen)
+	archive   *logs.Event
+	staging   map[string]*builder // by host and archive use
+	bulk      map[string]*bulkState
 }
 
 type bulkState struct {
