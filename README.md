@@ -324,8 +324,18 @@ tested, while the commands and views that use them are still to come.
 | ✅ ready | **Signs of tampering.** Runs of NUL bytes in a text log, left when a log is truncated while being written or the system stops abruptly, become events of their own. |
 | ✅ ready | **Windows event logs (EVTX)**, read by a parser written from scratch with the Go standard library only: Security, System, Sysmon, PowerShell, Defender, RDP and any other channel, including "dirty" files copied from a live system, damaged chunks and partly written records. Users, source addresses, processes and command lines are extracted from the common events. |
 | ✅ ready | **Detection rules** mapped to MITRE ATT&CK, for Linux, Windows and web logs alike: brute force and password spraying followed by a successful login, new accounts and administrators, persistence (services, scheduled tasks, cron, systemd, SSH keys, Run keys), dangerous commands (reverse shells, download and execute, encoded PowerShell, LOLBins, credential dumping, shadow copy deletion), cleared or truncated logs, DCSync, Kerberoasting and AS-REP roasting, LSASS access, web scanners and exploitation attempts. Each finding cites the events that prove it, and those events take its severity in the timeline. |
-| 🔜 planned | **Timeline and findings** in the command line (`astro logs …`), the terminal interface, the web interface and the REST API, with filters and severity colors. |
+| ✅ ready | **Command line**: `astro logs import`, `timeline`, `findings`, `evidence` and `analyze`, with filters (severity, host, user, address, source, event ID, text, time range), severity colors, CSV and JSON export, and the chain of custody of every file. |
+| 🔜 planned | **Timeline and findings** in the terminal interface, the web interface and the REST API. |
 | 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
+
+```sh
+astro case new sherlock-1
+astro logs import sherlock-1 ./triage/ --tz Europe/Rome   # files or folders, .gz included
+astro logs findings sherlock-1 --events                   # what the rules found, with the proving events
+astro logs timeline sherlock-1 --severity high            # critical in red, high in orange
+astro logs timeline sherlock-1 --ip 203.0.113.9 --csv > timeline.csv
+astro logs evidence sherlock-1 --custody                  # hashes and chain of custody
+```
 
 The same principles as the rest of astro apply: no new dependencies (every
 parser uses the Go standard library), evidence files are treated as untrusted
@@ -395,8 +405,9 @@ legge anche file "sporchi" o danneggiati. Sono pronte anche le regole di
 rilevamento mappate su MITRE ATT&CK (brute force seguito da login, nuovi
 amministratori, persistenza, comandi pericolosi, log cancellati, DCSync,
 Kerberoasting, attacchi web e altro): ogni finding cita gli eventi che lo
-provano. Arriveranno la timeline e i finding in tutte le interfacce e nei
-report.
+provano. Da riga di comando è già tutto utilizzabile (`astro logs import`,
+`timeline`, `findings`, `evidence`); arriveranno la timeline e i finding
+nell'interfaccia web, nella TUI, nella REST API e nei report.
 
 ## License
 
