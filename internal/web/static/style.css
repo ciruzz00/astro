@@ -426,6 +426,8 @@ body.public { min-height: 100vh; background:
 .form-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .import-form .form-actions { grid-column: 1 / -1; }
 .form-note { margin: .9rem 0 0; max-width: 95ch; }
+.upload-pick { display: flex; flex-wrap: wrap; gap: .6rem 1.2rem; }
+.upload-pick label.file { padding: .5rem .7rem; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-2); max-width: 100%; }
 
 .evidence { border-top: 1px solid var(--border); padding: .9rem 0 .6rem; }
 .evidence:first-of-type { border-top: none; padding-top: 0; }

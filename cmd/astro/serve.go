@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -76,17 +77,18 @@ token created with 'astro token create'. The server listens on localhost only un
 			root.Handle("/api/", apiHandler)
 			if !noWeb {
 				webHandler, err := web.NewHandler(web.Config{
-					Engine:  a.engine,
-					Cases:   a.cases,
-					Store:   a.store,
-					Tokens:  auth.NewManager(a.store),
-					Sources: a.apiSources,
-					Keys:    a,
-					Fetcher: datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
-					Version: version,
-					Actor:   actor(""),
-					Secure:  certFile != "",
-					Logger:  logger,
+					Engine:    a.engine,
+					Cases:     a.cases,
+					Store:     a.store,
+					Tokens:    auth.NewManager(a.store),
+					Sources:   a.apiSources,
+					Keys:      a,
+					Fetcher:   datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
+					Version:   version,
+					Actor:     actor(""),
+					UploadDir: filepath.Join(a.cfg.DataDir, "uploads"),
+					Secure:    certFile != "",
+					Logger:    logger,
 				})
 				if err != nil {
 					return err

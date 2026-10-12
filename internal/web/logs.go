@@ -197,42 +197,67 @@ func (s *server) importLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	back := caseURL(name) + "/evidence"
-	if err := parseForm(w, r); err != nil {
-		s.flashRedirect(w, r, back, "error", "Invalid form")
-		return
-	}
-	path := strings.TrimSpace(r.FormValue("path"))
-	opts := evidence.Options{Host: strings.TrimSpace(r.FormValue("host"))}
-	if path == "" || len(path) > 4096 || len(opts.Host) > 255 {
-		s.flashRedirect(w, r, back, "error", "Give the path of a file or folder on this computer.")
-		return
-	}
-	if tz := strings.TrimSpace(r.FormValue("tz")); tz != "" {
-		loc, err := time.LoadLocation(tz)
-		if err != nil {
-			s.flashRedirect(w, r, back, "error", s.tr(r, "Unknown time zone %s.", tz))
-			return
-		}
-		opts.Location = loc
-	}
-	if y := strings.TrimSpace(r.FormValue("year")); y != "" {
-		year, err := strconv.Atoi(y)
-		if err != nil || year < 1970 || year > 2200 {
-			s.flashRedirect(w, r, back, "error", "The year must be between 1970 and 2200.")
-			return
-		}
-		opts.Year = year
-	}
 	if _, err := s.Store.CaseID(r.Context(), name); err != nil {
 		s.flashRedirect(w, r, "/cases", "error", caseMessage(name, err))
 		return
 	}
+	if job := s.jobs.get(name); job != nil && job.Running {
+		s.flashRedirect(w, r, back, "error", "An import is already running for this case.")
+		return
+	}
+	// Uploads (files or a folder chosen in the browser) arrive as multipart
+	// and are streamed to disk; a plain form names a path on the server.
+	value := r.FormValue
+	var uploaded string
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		up, err := s.receiveUpload(w, r, name)
+		if err != nil {
+			s.flashRedirect(w, r, back, "error", s.tr(r, "Upload failed: %s", err.Error()))
+			return
+		}
+		value = func(k string) string { return up.fields[k] }
+		uploaded = up.dir
+	} else if err := parseForm(w, r); err != nil {
+		s.flashRedirect(w, r, back, "error", "Invalid form")
+		return
+	}
+	fail := func(msg string) {
+		if uploaded != "" {
+			_ = os.RemoveAll(uploaded)
+		}
+		s.flashRedirect(w, r, back, "error", msg)
+	}
+	path := strings.TrimSpace(value("path"))
+	opts := evidence.Options{Host: strings.TrimSpace(value("host"))}
+	if uploaded != "" {
+		path, opts.Note = uploaded, "copy uploaded through the web interface"
+	}
+	if path == "" || len(path) > 4096 || len(opts.Host) > 255 {
+		fail("Choose files or a folder to upload, or give a path on the computer where astro runs.")
+		return
+	}
+	if tz := strings.TrimSpace(value("tz")); tz != "" {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			fail(s.tr(r, "Unknown time zone %s.", tz))
+			return
+		}
+		opts.Location = loc
+	}
+	if y := strings.TrimSpace(value("year")); y != "" {
+		year, err := strconv.Atoi(y)
+		if err != nil || year < 1970 || year > 2200 {
+			fail("The year must be between 1970 and 2200.")
+			return
+		}
+		opts.Year = year
+	}
 	if _, err := os.Stat(path); err != nil { // #nosec G703 -- the analyst names a local file on purpose; it is only read
-		s.flashRedirect(w, r, back, "error", s.tr(r, "Cannot read %s on the server.", path))
+		fail(s.tr(r, "Cannot read %s on the server: when astro runs in Docker only its own folders are visible, so upload the files instead.", path))
 		return
 	}
 	if !s.jobs.start(name, path, s.now()) {
-		s.flashRedirect(w, r, back, "error", "An import is already running for this case.")
+		fail("An import is already running for this case.")
 		return
 	}
 	// The import outlives the request: keep its values, drop its cancellation.

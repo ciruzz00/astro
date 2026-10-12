@@ -6,9 +6,16 @@
 
 <section class="card">
   <header class="card-head"><h2>{{t "Import logs"}}</h2></header>
-  <form method="post" action="{{$base}}/logs/import" class="import-form">
-    <label class="field field-wide"><span>{{t "File or folder on this computer"}}</span>
-      <input name="path" required maxlength="4096" placeholder="/evidence/triage" value="{{.Form.Path}}" autocomplete="off" spellcheck="false"></label>
+  <form method="post" action="{{$base}}/logs/import" class="import-form" enctype="multipart/form-data" hx-boost="false">
+    <div class="field field-wide">
+      <span>{{t "Upload from this computer"}}</span>
+      <div class="upload-pick">
+        <label class="file">{{t "Files"}} <input type="file" name="files" multiple></label>
+        <label class="file">{{t "A whole folder"}} <input type="file" name="files" webkitdirectory multiple></label>
+      </div>
+    </div>
+    <label class="field field-wide"><span>{{t "Or a path on the computer where astro runs"}}</span>
+      <input name="path" maxlength="4096" placeholder="/evidence/triage" value="{{.Form.Path}}" autocomplete="off" spellcheck="false"></label>
     <label class="field"><span>{{t "Time zone of the logs"}}</span>
       <input name="tz" value="{{.Form.TZ}}" list="zones" autocomplete="off" spellcheck="false"></label>
     <datalist id="zones"><option value="UTC"><option value="Europe/Rome"><option value="Europe/London"><option value="Europe/Berlin"><option value="America/New_York"><option value="America/Los_Angeles"><option value="Asia/Tokyo"></datalist>
@@ -19,6 +26,7 @@
     <div class="form-actions"><button class="btn btn-primary" type="submit">{{template "icon" "download"}}{{t "Import and analyze"}}</button></div>
   </form>
   <p class="muted small form-note">{{t "Files are read where they are and never modified: astro keeps their hashes and a chain of custody. Supported: Windows .evtx, auth.log, secure, syslog, wtmp, btmp, utmp, bash and zsh history, web access logs and Docker container logs, also compressed (.gz)."}}</p>
+  <p class="muted small form-note">{{t "Uploaded files are copied into the astro data folder (the hashes are those of their content, so they match the originals); a path is read in place. When astro runs in Docker it only sees its own folders: upload the files instead."}}</p>
 </section>
 
 <section class="card">

@@ -48,8 +48,11 @@ type Config struct {
 	Secure bool
 	// Actor is recorded in the chain of custody of the evidence imported
 	// from the web interface.
-	Actor  string
-	Logger *slog.Logger
+	Actor string
+	// UploadDir receives the log files uploaded through the browser;
+	// empty disables uploads.
+	UploadDir string
+	Logger    *slog.Logger
 }
 
 type server struct {

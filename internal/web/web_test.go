@@ -1,14 +1,18 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -67,10 +71,11 @@ func (f *fakeKeys) TestKey(context.Context, string) ([]KeyTest, error) {
 }
 
 type env struct {
-	srv    *httptest.Server
-	client *http.Client
-	secret string
-	store  *store.Store
+	srv     *httptest.Server
+	client  *http.Client
+	secret  string
+	store   *store.Store
+	uploads string
 }
 
 func setup(t *testing.T) *env {
@@ -86,6 +91,7 @@ func setup(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	uploads := t.TempDir()
 	h, err := NewHandler(Config{
 		Engine: eng, Cases: cases.New(st, eng), Store: st, Tokens: tokens,
 		Sources: func() []api.Source {
@@ -93,7 +99,7 @@ func setup(t *testing.T) *env {
 		},
 		Keys:    &fakeKeys{},
 		Fetcher: func(context.Context, string, int64) ([]byte, error) { return nil, io.ErrUnexpectedEOF },
-		Version: "test", Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Version: "test", Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), UploadDir: uploads,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +107,7 @@ func setup(t *testing.T) *env {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	jar, _ := cookiejar.New(nil)
-	return &env{srv: srv, client: &http.Client{Jar: jar}, secret: secret, store: st}
+	return &env{srv: srv, client: &http.Client{Jar: jar}, secret: secret, store: st, uploads: uploads}
 }
 
 func (e *env) do(t *testing.T, method, path string, form url.Values) (*http.Response, string) {
@@ -471,7 +477,7 @@ func TestLogAnalysisPages(t *testing.T) {
 		form url.Values
 		want string
 	}{
-		{url.Values{"path": {""}}, "Give the path"},
+		{url.Values{"path": {""}}, "Choose files or a folder"},
 		{url.Values{"path": {filepath.Join(dir, "missing")}}, "Cannot read"},
 		{url.Values{"path": {dir}, "tz": {"Mars/Olympus"}}, "Unknown time zone"},
 		{url.Values{"path": {dir}, "year": {"1800"}}, "The year must be"},
@@ -550,5 +556,106 @@ func TestLogAnalysisPages(t *testing.T) {
 	}
 	if resp, _ := e.do(t, "GET", "/cases/nope/timeline", nil); resp.StatusCode != 404 {
 		t.Errorf("unknown case timeline: %d", resp.StatusCode)
+	}
+}
+
+func TestLogUpload(t *testing.T) {
+	e := setup(t)
+	e.login(t)
+	e.do(t, "POST", "/cases", url.Values{"name": {"inc-up"}, "tlp": {"AMBER"}})
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	_ = mw.WriteField("tz", "UTC")
+	_ = mw.WriteField("year", "2026")
+	files := map[string]string{
+		"triage/var/log/auth.log": "Oct 11 21:00:01 web01 sshd[1]: Accepted password for root from 203.0.113.9 port 4100 ssh2\n",
+		"../../../escape.log":     "Oct 11 21:00:02 web01 sshd[1]: Failed password for root from 203.0.113.9 port 4101 ssh2\n",
+		`C:\\triage\\notes.txt`:   "not a log\n",
+	}
+	for name, content := range files {
+		h := textproto.MIMEHeader{}
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="files"; filename="%s"`, strings.ReplaceAll(name, `"`, `\"`)))
+		w, _ := mw.CreatePart(h)
+		_, _ = w.Write([]byte(content))
+	}
+	_ = mw.Close()
+	req, _ := http.NewRequest("POST", e.srv.URL+"/cases/inc-up/logs/import", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := e.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(page), "Import started") {
+		t.Fatalf("upload not started:\n%s", page)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, status := e.do(t, "GET", "/cases/inc-up/logs/status", nil)
+		if strings.Contains(status, "Last import: 2 files, 2 events") {
+			break
+		}
+		if time.Now().After(deadline) || strings.Contains(status, "failed") {
+			t.Fatalf("upload import did not finish: %s", status)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	var stored []string
+	_ = filepath.WalkDir(e.uploads, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(e.uploads, p)
+			stored = append(stored, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	if len(stored) != 3 {
+		t.Fatalf("stored files = %v", stored)
+	}
+	for _, f := range stored {
+		if !strings.HasPrefix(f, "inc-up/") || strings.Contains(f, "..") {
+			t.Errorf("file stored outside the case upload folder: %s", f)
+		}
+	}
+	joined := strings.Join(stored, " ")
+	if !strings.Contains(joined, "/triage/var/log/auth.log") || !strings.Contains(joined, "/escape.log") || !strings.Contains(joined, "/triage/notes.txt") {
+		t.Errorf("relative paths not kept or not cleaned: %v", stored)
+	}
+	_, ev := e.do(t, "GET", "/cases/inc-up/evidence", nil)
+	if !strings.Contains(ev, "copy uploaded through the web interface") || !strings.Contains(ev, "custody verified") {
+		t.Error("custody does not record the upload")
+	}
+
+	// An empty upload (no file chosen, no path) is refused and leaves nothing.
+	body.Reset()
+	mw = multipart.NewWriter(&body)
+	_ = mw.WriteField("tz", "UTC")
+	_ = mw.Close()
+	req, _ = http.NewRequest("POST", e.srv.URL+"/cases/inc-up/logs/import", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err = e.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(page), "Choose files or a folder") {
+		t.Errorf("empty upload accepted:\n%s", page)
+	}
+}
+
+func TestUploadPath(t *testing.T) {
+	for in, want := range map[string]string{
+		`form-data; name="files"; filename="a/b/auth.log"`:     filepath.Join("a", "b", "auth.log"),
+		`form-data; name="files"; filename="../../etc/passwd"`: filepath.Join("etc", "passwd"),
+		`form-data; name="files"; filename="C:\\x\\y.evtx"`:    filepath.Join("x", "y.evtx"),
+		`form-data; name="files"; filename="/abs/x.log"`:       filepath.Join("abs", "x.log"),
+		`form-data; name="files"; filename=".."`:               "",
+		`form-data; name="files"; filename=""`:                 "",
+		`garbage`:                                              "",
+	} {
+		if got := uploadPath(in); got != want {
+			t.Errorf("uploadPath(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
