@@ -20,13 +20,15 @@ const (
 	KindSyslog      Kind = "syslog"
 	KindBashHistory Kind = "bash-history"
 	KindZshHistory  Kind = "zsh-history"
-	KindAccess      Kind = "access-log"  // web server access log (Common/Combined)
-	KindDocker      Kind = "docker-json" // Docker json-file container log
-	KindBodyfile    Kind = "bodyfile"    // filesystem timeline (The Sleuth Kit bodyfile, UAC)
+	KindAccess      Kind = "access-log"   // web server access log (Common/Combined)
+	KindDocker      Kind = "docker-json"  // Docker json-file container log
+	KindBodyfile    Kind = "bodyfile"     // filesystem timeline (The Sleuth Kit bodyfile, UAC)
+	KindProcessList Kind = "process-list" // "ps -ef" taken on the live system
+	KindSockets     Kind = "socket-list"  // "ss -tanp" taken on the live system
 )
 
 // Kinds lists the known formats.
-var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker, KindBodyfile}
+var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker, KindBodyfile, KindProcessList, KindSockets}
 
 // HeadSize is how many leading bytes Detect needs.
 const HeadSize = 4096
@@ -46,6 +48,8 @@ var (
 	reAccess = regexp.MustCompile(`^\S+ \S+ \S+ \[\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\] "`)
 	reDocker = regexp.MustCompile(`^\{"log":".*","stream":"\w+","time":"\d{4}-`)
 	// MD5|name|inode|mode|uid|gid|size|atime|mtime|ctime|crtime
+	rePsEf     = regexp.MustCompile(`^\s*UID\s+PID\s+PPID\s+C\s+STIME\s+TTY\s+TIME\s+CMD\s*$`)
+	reSSTCP    = regexp.MustCompile(`^State\s+Recv-Q\s+Send-Q\s+Local Address:Port\s+Peer Address:Port`)
 	reBodyfile = regexp.MustCompile(`^(?:0|[0-9a-fA-F]{32})\|.+\|[0-9-]+\|[^|]{1,24}\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\s*$`)
 )
 
@@ -95,8 +99,20 @@ func Detect(name string, head []byte) Kind {
 		return KindAccess
 	case reBodyfile.Match(first):
 		return KindBodyfile
+	case rePsEf.Match(first) && oneListing(base, "ps_-", "ps_-ef.txt"):
+		return KindProcessList
+	case reSSTCP.Match(first) && oneListing(base, "ss_-", "ss_-tanp.txt"):
+		return KindSockets
 	}
 	return KindUnknown
+}
+
+// oneListing keeps one of the listings UAC saves with different options
+// (ps -ef and ps -deaf, ss -tanp and ss -tlnp...), which would repeat the
+// same processes and sockets: a file named with the UAC prefix is read
+// only if it is the chosen one.
+func oneListing(base, uacPrefix, chosen string) bool {
+	return !strings.HasPrefix(base, uacPrefix) || base == chosen
 }
 
 // looksLikeUtmp checks the first record: a known ut_type, a plausible
