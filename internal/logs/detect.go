@@ -22,10 +22,11 @@ const (
 	KindZshHistory  Kind = "zsh-history"
 	KindAccess      Kind = "access-log"  // web server access log (Common/Combined)
 	KindDocker      Kind = "docker-json" // Docker json-file container log
+	KindBodyfile    Kind = "bodyfile"    // filesystem timeline (The Sleuth Kit bodyfile, UAC)
 )
 
 // Kinds lists the known formats.
-var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker}
+var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker, KindBodyfile}
 
 // HeadSize is how many leading bytes Detect needs.
 const HeadSize = 4096
@@ -44,6 +45,8 @@ var (
 	reZsh    = regexp.MustCompile(`(?m)^: \d{9,11}:\d+;`)
 	reAccess = regexp.MustCompile(`^\S+ \S+ \S+ \[\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\] "`)
 	reDocker = regexp.MustCompile(`^\{"log":".*","stream":"\w+","time":"\d{4}-`)
+	// MD5|name|inode|mode|uid|gid|size|atime|mtime|ctime|crtime
+	reBodyfile = regexp.MustCompile(`^(?:0|[0-9a-fA-F]{32})\|.+\|[0-9-]+\|[^|]{1,24}\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\s*$`)
 )
 
 // IsGzip reports whether head starts a gzip stream (rotated logs: auth.log.2.gz).
@@ -90,6 +93,8 @@ func Detect(name string, head []byte) Kind {
 		return KindDocker
 	case reAccess.Match(first):
 		return KindAccess
+	case reBodyfile.Match(first):
+		return KindBodyfile
 	}
 	return KindUnknown
 }
