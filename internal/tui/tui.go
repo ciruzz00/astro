@@ -17,6 +17,7 @@ import (
 	"github.com/ciruzz00/astro/internal/datasets"
 	"github.com/ciruzz00/astro/internal/engine"
 	"github.com/ciruzz00/astro/internal/ioc"
+	"github.com/ciruzz00/astro/internal/logs"
 	"github.com/ciruzz00/astro/internal/render"
 	"github.com/ciruzz00/astro/internal/report"
 	"github.com/ciruzz00/astro/internal/store"
@@ -32,6 +33,8 @@ type Config struct {
 	Fetcher       datasets.Fetcher
 	Version       string
 	AttackVersion func() string
+	// Actor is recorded in the chain of custody of imported logs.
+	Actor string
 }
 
 type tab int
@@ -50,6 +53,8 @@ type prompt struct {
 	label  string
 	input  textinput.Model
 	submit func(string) tea.Cmd
+	// allowEmpty submits an empty value too (to clear a filter).
+	allowEmpty bool
 }
 
 // Model is the Bubble Tea model of the interface.
@@ -79,6 +84,11 @@ type Model struct {
 	includeClosed bool
 	open          *cases.View
 	itemSel       int
+	mode          caseMode
+	logs          caseLogs
+	tl            timeline
+	findSel       int
+	findMin       logs.Severity
 
 	// sources
 	datasets []store.Dataset
@@ -154,6 +164,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshDetail()
 		return m, nil
 
+	case logsMsg:
+		if m.open == nil || msg.name != m.open.Case.Name {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.setStatus(caseError(msg.err).Error(), true)
+			return m, nil
+		}
+		m.logs = msg.logs
+		m.findSel = clamp(m.findSel, len(m.shownFindings()))
+		m.refreshDetail()
+		return m, nil
+
+	case timelineMsg:
+		if m.open == nil || msg.name != m.open.Case.Name || msg.minSev != m.tl.minSev || msg.grep != m.tl.grep {
+			return m, nil // a newer filter is loading
+		}
+		if msg.err != nil {
+			m.setStatus(caseError(msg.err).Error(), true)
+			return m, nil
+		}
+		m.tl.events, m.tl.total, m.tl.offset = msg.events, msg.total, msg.offset
+		m.tl.sel = clamp(msg.sel, len(msg.events))
+		m.refreshDetail()
+		return m, nil
+
+	case grepMsg:
+		m.busy = false
+		if m.open != nil {
+			m.tl.grep = string(msg)
+			return m, m.loadTimelineCmd(m.open.Case.Name, 0, 0)
+		}
+		return m, nil
+
 	case sourcesMsg:
 		if msg.err == nil {
 			m.datasets = msg.datasets
@@ -171,7 +215,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.reload {
 			cmds = append(cmds, m.loadCasesCmd())
 			if m.open != nil {
-				cmds = append(cmds, m.loadCaseCmd(m.open.Case.Name))
+				name := m.open.Case.Name
+				cmds = append(cmds, m.loadCaseCmd(name), m.loadLogsCmd(name))
+				if m.mode == modeTimeline {
+					cmds = append(cmds, m.loadTimelineCmd(name, m.tl.offset, m.tl.sel))
+				}
 			}
 		}
 		return m, tea.Batch(cmds...)
@@ -303,8 +351,9 @@ func (m Model) caseListKeys(key string) (tea.Model, tea.Cmd) {
 		m.caseSel = clamp(m.caseSel+1, len(m.caseList))
 	case "enter":
 		if len(m.caseList) > 0 {
-			m.itemSel = 0
-			return m, m.loadCaseCmd(m.caseList[m.caseSel].Name)
+			name := m.caseList[m.caseSel].Name
+			m.itemSel, m.mode, m.logs, m.tl, m.findSel, m.findMin = 0, modeIndicators, caseLogs{}, timeline{}, 0, logs.Info
+			return m, tea.Batch(m.loadCaseCmd(name), m.loadLogsCmd(name))
 		}
 	case "n":
 		m.ask("new case name (letters, digits, . _ -)", "", m.createCaseCmd)
@@ -319,17 +368,52 @@ func (m Model) caseListKeys(key string) (tea.Model, tea.Cmd) {
 
 func (m Model) caseKeys(key string) (tea.Model, tea.Cmd) {
 	name := m.open.Case.Name
+	// Keys of every view of the case.
 	switch key {
 	case "esc", "backspace", "left", "h":
+		if m.mode != modeIndicators {
+			m.mode = modeIndicators
+			m.resize()
+			m.refreshDetail()
+			return m, nil
+		}
 		m.open = nil
 		return m, m.loadCasesCmd()
+	case "t":
+		m.mode = modeTimeline
+		m.refreshDetail()
+		return m, tea.Batch(m.loadTimelineCmd(name, m.tl.offset, m.tl.sel), m.loadLogsCmd(name))
+	case "f":
+		m.mode = modeFindings
+		m.refreshDetail()
+		return m, m.loadLogsCmd(name)
+	case "l":
+		m.ask("import logs: a file or a folder on this machine (read only, analyzed afterwards)", "", func(v string) tea.Cmd { return m.importCmd(name, v) })
+		return m, nil
+	case "m":
+		m.ask("add note", "", func(v string) tea.Cmd { return m.noteCmd(name, v) })
+		return m, nil
+	case "e":
+		m.ask("export format: "+strings.Join(report.Formats, ", "), "pdf", func(v string) tea.Cmd { return m.exportCmd(name, v) })
+		return m, nil
+	case "c":
+		status := "closed"
+		if m.open.Case.Status == "closed" {
+			status = "open"
+		}
+		return m, m.statusCmd(name, status)
+	}
+	if m.mode != modeIndicators {
+		return m.logKeys(key)
+	}
+	switch key {
 	case "up", "k":
 		m.itemSel = clamp(m.itemSel-1, len(m.open.Items))
 		m.refreshDetail()
 	case "down", "j":
 		m.itemSel = clamp(m.itemSel+1, len(m.open.Items))
 		m.refreshDetail()
-	case "pgdown", "space", "f":
+	case "pgdown", "space":
 		m.detail.PageDown()
 	case "pgup", "b":
 		m.detail.PageUp()
@@ -341,16 +425,6 @@ func (m Model) caseKeys(key string) (tea.Model, tea.Cmd) {
 		}
 	case "i":
 		m.ask("add indicators (several at once, or paste text)", "", func(v string) tea.Cmd { return m.addIndicatorsCmd(name, v) })
-	case "m":
-		m.ask("add note", "", func(v string) tea.Cmd { return m.noteCmd(name, v) })
-	case "e":
-		m.ask("export format: "+strings.Join(report.Formats, ", "), "pdf", func(v string) tea.Cmd { return m.exportCmd(name, v) })
-	case "c":
-		status := "closed"
-		if m.open.Case.Status == "closed" {
-			status = "open"
-		}
-		return m, m.statusCmd(name, status)
 	}
 	return m, nil
 }
@@ -363,9 +437,9 @@ func (m Model) handlePromptKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		value := strings.TrimSpace(m.prompt.input.Value())
-		submit := m.prompt.submit
+		submit, allowEmpty := m.prompt.submit, m.prompt.allowEmpty
 		m.prompt = nil
-		if value == "" {
+		if value == "" && !allowEmpty {
 			return m, nil
 		}
 		m.busy = true
@@ -446,7 +520,17 @@ func (m *Model) bodyHeight() int {
 	return max(5, h)
 }
 
-func (m *Model) leftWidth() int { return max(24, m.width*2/5) }
+func (m *Model) leftWidth() int {
+	if m.tab == tabCases && m.open != nil {
+		switch m.mode {
+		case modeTimeline:
+			return max(24, m.width*3/5)
+		case modeFindings:
+			return max(24, m.width/2)
+		}
+	}
+	return max(24, m.width*2/5)
+}
 
 // refreshDetail renders the selected report into the scrollable pane.
 func (m *Model) refreshDetail() {
@@ -454,6 +538,10 @@ func (m *Model) refreshDetail() {
 	var rep *engine.Report
 	notes := ""
 	switch {
+	case m.tab == tabCases && m.open != nil && m.mode != modeIndicators:
+		m.detail.SetContent(lipgloss.NewStyle().Width(m.detail.Width()).Render(m.logDetail()))
+		m.detail.GotoTop()
+		return
 	case m.tab == tabCases && m.open != nil:
 		if len(m.open.Items) > 0 {
 			rep = m.open.Items[m.itemSel].Report
@@ -471,6 +559,23 @@ func (m *Model) refreshDetail() {
 	content = lipgloss.NewStyle().Width(m.detail.Width()).Render(content)
 	m.detail.SetContent(content)
 	m.detail.GotoTop()
+}
+
+// logDetail is the detail pane of the Timeline and Findings views.
+func (m *Model) logDetail() string {
+	w := m.detail.Width()
+	if m.mode == modeFindings {
+		fs := m.shownFindings()
+		if len(fs) == 0 {
+			return ""
+		}
+		f := &fs[clamp(m.findSel, len(fs))]
+		return findingText(f, m.logs.cited[f.ID], w)
+	}
+	if len(m.tl.events) == 0 {
+		return ""
+	}
+	return eventText(&m.tl.events[clamp(m.tl.sel, len(m.tl.events))], w)
 }
 
 func reportText(rep *engine.Report, width int) string {

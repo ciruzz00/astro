@@ -17,7 +17,8 @@ func newTUICmd(g *globalFlags) *cobra.Command {
 		Use:   "tui",
 		Short: "Open the interactive terminal interface",
 		Long: `Open the interactive terminal interface: search indicators, browse and
-work on cases, export reports and sync datasets with the keyboard.
+work on cases, import logs and read their timeline and findings, export
+reports and sync datasets with the keyboard.
 Press ? inside the interface for the keys.`,
 		Args: cobra.NoArgs,
 		RunE: withApp(g, func(cmd *cobra.Command, a *app, _ []string) error {
@@ -33,6 +34,7 @@ Press ? inside the interface for the keys.`,
 				Fetcher:       datasets.HTTPFetcher(httpx.NewClient(5 * time.Minute)),
 				Version:       version,
 				AttackVersion: func() string { return a.attackVersion(cmd.Context()) },
+				Actor:         actor(""),
 			})
 		}),
 	}

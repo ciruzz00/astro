@@ -83,8 +83,12 @@ func (m Model) keyHelp() string {
 		keys = [][2]string{{"enter", "search"}, {"esc", "results"}, {"ctrl+o", "offline"}, {"ctrl+c", "quit"}}
 	case m.tab == tabSearch:
 		keys = [][2]string{{"↑↓", "select"}, {"pgup/pgdn", "scroll"}, {"/", "new search"}, {"ctrl+s", "save to case"}, {"ctrl+o", "offline"}, {"1-3 ?", "tabs"}, {"q", "quit"}}
+	case m.tab == tabCases && m.open != nil && m.mode == modeTimeline:
+		keys = [][2]string{{"↑↓", "select"}, {"+/-", "severity"}, {"/", "filter"}, {"pgup/pgdn", "page"}, {"g/G", "first/last"}, {"space/b", "scroll detail"}, {"f", "findings"}, {"esc", "indicators"}}
+	case m.tab == tabCases && m.open != nil && m.mode == modeFindings:
+		keys = [][2]string{{"↑↓", "select"}, {"+/-", "severity"}, {"i", "add their IOCs"}, {"r", "analyze again"}, {"space/b", "scroll detail"}, {"t", "timeline"}, {"esc", "indicators"}}
 	case m.tab == tabCases && m.open != nil:
-		keys = [][2]string{{"↑↓", "select"}, {"s/S", "search new/all"}, {"i", "add IOCs"}, {"m", "note"}, {"e", "export"}, {"c", "close/reopen"}, {"esc", "back"}}
+		keys = [][2]string{{"↑↓", "select"}, {"s/S", "search new/all"}, {"i", "add IOCs"}, {"t/f", "timeline/findings"}, {"l", "import logs"}, {"m", "note"}, {"e", "export"}, {"c", "close/reopen"}, {"esc", "back"}}
 	case m.tab == tabCases:
 		keys = [][2]string{{"↑↓", "select"}, {"enter", "open"}, {"n", "new case"}, {"a", "show closed"}, {"r", "refresh"}, {"q", "quit"}}
 	case m.tab == tabSources:
@@ -172,20 +176,34 @@ func (m Model) caseView() string {
 
 	h := m.paneHeight()
 	left := m.leftWidth()
+	var list string
+	switch m.mode {
+	case modeTimeline:
+		list = m.timelineRows(left-4, h-4)
+	case modeFindings:
+		list = m.findingRows(left-4, h-4)
+	default:
+		list = m.itemRows(left-4, h-4)
+	}
+	panes := lipgloss.JoinHorizontal(lipgloss.Top,
+		sPaneOn.Width(left).Height(h-2).Render(list),
+		sPane.Width(m.width-left).Height(h-2).Render(m.detail.View()))
+	return lipgloss.JoinVertical(lipgloss.Left, head, stats, m.caseTabs(), panes)
+}
+
+func (m Model) itemRows(width, height int) string {
 	var rows []string
 	for i, it := range m.open.Items {
 		v := it.Verdict
 		if it.SearchedAt == nil {
 			v = "not searched"
 		}
-		rows = append(rows, listRow(v, ioc.Defang(it.Indicator), left-4, i == m.itemSel, true))
+		rows = append(rows, listRow(v, ioc.Defang(it.Indicator), width, i == m.itemSel, true))
 	}
 	if len(rows) == 0 {
 		rows = []string{sMuted.Render("No indicators: press i to add some.")}
 	}
-	list := sPaneOn.Width(left).Height(h - 2).Render(window(rows, m.itemSel, h-4))
-	detail := sPane.Width(m.width - left).Height(h - 2).Render(m.detail.View())
-	return lipgloss.JoinVertical(lipgloss.Left, head, stats, "", lipgloss.JoinHorizontal(lipgloss.Top, list, detail))
+	return window(rows, m.itemSel, height)
 }
 
 // --- sources ---
@@ -225,6 +243,9 @@ func helpView() string {
 		{"2 Cases", "enter opens a case; n creates one; a shows closed cases"},
 		{"", "in a case: s searches new indicators, S searches all again, i adds indicators, m adds a note,"},
 		{"", "e exports (pdf, md, json, stix, navigator) to the current directory, c closes or reopens, esc goes back"},
+		{"", "l imports a log file or folder (read only) and analyzes it; t opens the timeline, f the findings"},
+		{"Timeline", "+/- sets the minimum severity, / filters by text, pgup/pgdn pages, g/G first/last event"},
+		{"Findings", "+/- sets the minimum severity, i adds their indicators to the case, r runs the rules again"},
 		{"3 Sources", "enabled sources and offline datasets; u downloads or updates the datasets"},
 		{"ctrl+o", "offline mode: only local datasets are queried, nothing leaves this machine"},
 		{"q / ctrl+c", "quit"},
@@ -266,13 +287,18 @@ func paneStyle(focused bool) lipgloss.Style {
 
 // window returns the rows around sel that fit in height.
 func window(rows []string, sel, height int) string {
-	if height < 1 || len(rows) <= height {
-		return strings.Join(rows, "\n")
-	}
-	start := max(0, sel-height/2)
-	end := min(len(rows), start+height)
-	start = max(0, end-height)
+	start, end := span(len(rows), sel, height)
 	return strings.Join(rows[start:end], "\n")
+}
+
+// span is the range of n rows around sel that fits in height.
+func span(n, sel, height int) (start, end int) {
+	if height < 1 || n <= height {
+		return 0, n
+	}
+	start = max(0, sel-height/2)
+	end = min(n, start+height)
+	return max(0, end-height), end
 }
 
 // truncate shortens plain text to n display cells.

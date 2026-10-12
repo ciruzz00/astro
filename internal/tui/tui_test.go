@@ -82,7 +82,7 @@ func run(t *testing.T, m Model, cmd tea.Cmd, depth int) Model {
 		for _, c := range msg {
 			m = run(t, m, c, depth+1)
 		}
-	case searchDoneMsg, casesMsg, caseMsg, sourcesMsg, doneMsg:
+	case searchDoneMsg, casesMsg, caseMsg, sourcesMsg, doneMsg, logsMsg, timelineMsg, grepMsg:
 		next, c := m.Update(msg)
 		m = run(t, next.(Model), c, depth+1)
 	}

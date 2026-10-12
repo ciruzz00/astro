@@ -3,6 +3,7 @@ package tui
 import (
 	"charm.land/lipgloss/v2"
 
+	"github.com/ciruzz00/astro/internal/logs"
 	"github.com/ciruzz00/astro/internal/provider"
 )
 
@@ -41,6 +42,22 @@ func verdictStyle(v provider.Verdict) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(cGreen)
 	case provider.VerdictInfo:
 		return lipgloss.NewStyle().Foreground(cBlue)
+	}
+	return sMuted
+}
+
+// sevStyle uses the severity palette of the command line (render.Severity):
+// critical red, high orange, medium yellow, low blue, info gray.
+func sevStyle(sev logs.Severity) lipgloss.Style {
+	switch sev {
+	case logs.Critical:
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("1"))
+	case logs.High:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
+	case logs.Medium:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	case logs.Low:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 	}
 	return sMuted
 }
