@@ -74,7 +74,11 @@ func (*Parser) Parse(ctx context.Context, r io.Reader, opts logs.Options, emit f
 		text := strings.TrimRight(partial.String(), "\r\n")
 		partial.Reset()
 
-		e := &logs.Event{Time: first, Source: opts.Source, Raw: text, Message: text, Kind: KindOutput,
+		source := opts.Source
+		if container != "" {
+			source = "docker " + container
+		}
+		e := &logs.Event{Time: first, Source: source, Raw: text, Message: text, Kind: KindOutput,
 			Process: container, Ref: logs.EvidenceRef{Record: "line " + strconv.Itoa(firstLine)}}
 		if req, ok := access.ParseLine(text); ok {
 			req.Fill(e)

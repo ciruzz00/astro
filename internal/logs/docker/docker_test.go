@@ -27,7 +27,7 @@ func TestParse(t *testing.T) {
 	if err != nil || st.Errors != 2 || len(evs) != 3 {
 		t.Fatalf("stats = %+v, events = %d, err = %v", st, len(evs), err)
 	}
-	if e := evs[0]; e.Kind != KindOutput || e.Message != "Starting web app..." || e.Fields["container_id"] != id[:12] ||
+	if e := evs[0]; e.Kind != KindOutput || e.Message != "Starting web app..." || e.Fields["container_id"] != id[:12] || e.Source != "docker "+id[:12] ||
 		e.Fields["stream"] != "stdout" || !e.Time.Equal(time.Date(2026, 10, 11, 21, 0, 0, 123456789, time.UTC)) {
 		t.Errorf("output = %+v", e)
 	}
