@@ -322,7 +322,7 @@ tested, while the commands and views that use them are still to come.
 | ✅ ready | **Shell history.** bash and zsh, with or without timestamps, multi-line commands included. |
 | ✅ ready | **Web and container logs.** Web server access logs (Common and Combined formats) and Docker container logs, with client address, request, status and User-Agent. |
 | ✅ ready | **Signs of tampering.** Runs of NUL bytes in a text log, left when a log is truncated while being written or the system stops abruptly, become events of their own. |
-| 🚧 in progress | **Windows event logs (EVTX)**, read by a parser written from scratch with the Go standard library only. |
+| ✅ ready | **Windows event logs (EVTX)**, read by a parser written from scratch with the Go standard library only: Security, System, Sysmon, PowerShell, Defender, RDP and any other channel, including "dirty" files copied from a live system, damaged chunks and partly written records. Users, source addresses, processes and command lines are extracted from the common events. |
 | 🔜 planned | **Detection rules** mapped to MITRE ATT&CK: brute force followed by a login, new administrators, persistence, suspicious commands, cleared logs, Kerberoasting, DCSync and more. |
 | 🔜 planned | **Timeline and findings** in the command line (`astro logs …`), the terminal interface, the web interface and the REST API, with filters and severity colors. |
 | 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
@@ -389,10 +389,11 @@ timeline con gli eventi gravi in rosso. Sono già pronti, nel codice e testati,
 la gestione delle prove (lette dove sono, mai copiate né modificate, con hash e
 catena di custodia a prova di modifica) e i parser per auth.log/syslog, wtmp,
 btmp e utmp, la history di bash e zsh, gli access log dei server web e i log
-dei container Docker, compresi i segni di log troncati. Sono in corso il parser
-degli eventi Windows (EVTX), scritto da zero con la sola libreria standard di
-Go, e poi arriveranno le regole di rilevamento mappate su MITRE ATT&CK, la
-timeline e i finding in tutte le interfacce e nei report.
+dei container Docker, compresi i segni di log troncati, e il parser degli
+eventi Windows (EVTX), scritto da zero con la sola libreria standard di Go, che
+legge anche file "sporchi" o danneggiati. Arriveranno le regole di rilevamento
+mappate su MITRE ATT&CK, la timeline e i finding in tutte le interfacce e nei
+report.
 
 ## License
 
