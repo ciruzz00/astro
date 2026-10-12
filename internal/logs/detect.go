@@ -25,10 +25,11 @@ const (
 	KindBodyfile    Kind = "bodyfile"     // filesystem timeline (The Sleuth Kit bodyfile, UAC)
 	KindProcessList Kind = "process-list" // "ps -ef" taken on the live system
 	KindSockets     Kind = "socket-list"  // "ss -tanp" taken on the live system
+	KindConfig      Kind = "config"       // APT hooks, crontabs and systemd units
 )
 
 // Kinds lists the known formats.
-var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker, KindBodyfile, KindProcessList, KindSockets}
+var Kinds = []Kind{KindEVTX, KindWtmp, KindBtmp, KindUtmp, KindSyslog, KindBashHistory, KindZshHistory, KindAccess, KindDocker, KindBodyfile, KindProcessList, KindSockets, KindConfig}
 
 // HeadSize is how many leading bytes Detect needs.
 const HeadSize = 4096
@@ -52,6 +53,35 @@ var (
 	reSSTCP    = regexp.MustCompile(`^State\s+Recv-Q\s+Send-Q\s+Local Address:Port\s+Peer Address:Port`)
 	reBodyfile = regexp.MustCompile(`^(?:0|[0-9a-fA-F]{32})\|.+\|[0-9-]+\|[^|]{1,24}\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\|\d+\s*$`)
 )
+
+// Configuration files that make commands run later (see package config).
+const (
+	ConfigApt      = "apt"
+	ConfigCron     = "cron"      // /etc/crontab, /etc/cron.d: a user before the command
+	ConfigUserCron = "user-cron" // /var/spool/cron: no user field
+	ConfigSystemd  = "systemd"
+)
+
+var configPaths = []struct {
+	re   *regexp.Regexp
+	kind string
+}{
+	{regexp.MustCompile(`/etc/apt/apt\.conf(\.d/[^/]+)?$`), ConfigApt},
+	{regexp.MustCompile(`/etc/(crontab|cron\.d/[^/]+)$`), ConfigCron},
+	{regexp.MustCompile(`/var/spool/cron/(crontabs/)?[^/]+$`), ConfigUserCron},
+	{regexp.MustCompile(`/systemd/(system|user)/[^/]+\.(service|timer|socket|path)$`), ConfigSystemd},
+}
+
+// ConfigFile tells which configuration format a path holds ("" if none).
+func ConfigFile(p string) string {
+	p = strings.ReplaceAll(p, `\`, "/")
+	for _, c := range configPaths {
+		if c.re.MatchString(p) {
+			return c.kind
+		}
+	}
+	return ""
+}
 
 // IsGzip reports whether head starts a gzip stream (rotated logs: auth.log.2.gz).
 func IsGzip(head []byte) bool { return bytes.HasPrefix(head, magicGzip) }
@@ -82,6 +112,9 @@ func Detect(name string, head []byte) Kind {
 	head = bytes.ReplaceAll(head, []byte{0}, nil)
 	if !isText(head) {
 		return KindUnknown
+	}
+	if ConfigFile(name) != "" {
+		return KindConfig
 	}
 	if strings.HasSuffix(base, "history") {
 		if reZsh.Match(head) || strings.Contains(base, "zsh") {
