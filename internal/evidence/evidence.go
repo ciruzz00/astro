@@ -26,8 +26,8 @@ import (
 
 // Defaults for the import limits.
 const (
-	DefaultMaxFileSize = 8 << 30 // 8 GiB
-	DefaultMaxFiles    = 10000
+	DefaultMaxFileSize = 8 << 30   // 8 GiB
+	DefaultMaxFiles    = 100000    // triage collections (UAC, KAPE) hold tens of thousands of files
 	DefaultMaxEvents   = 5_000_000 // per file
 	batchSize          = 1000
 	// gzip streams may expand at most this much (and at least to minExpand),
