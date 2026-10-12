@@ -163,7 +163,7 @@ func (s *server) evidencePage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	d := evidenceData{Case: c, Job: s.jobs.get(c.Name), Form: importForm{TZ: "UTC"}}
+	d := evidenceData{Case: c, Job: s.jobs.get(c.Name), Form: importForm{}}
 	for _, e := range list {
 		row := evidenceRow{Evidence: e}
 		if row.Custody, err = s.Store.Custody(r.Context(), e.ID); err != nil {

@@ -152,6 +152,7 @@ var italian = map[string]string{ // #nosec G101 -- interface translations, not c
 	"imported": "importato", "parsed": "analizzato", "verified": "verificato", "changed": "modificato", "exported": "esportato",
 	"No evidence yet: import a file or a folder above.":                         "Ancora nessuna prova: importa un file o una cartella qui sopra.",
 	"Importing and analyzing %s, started %s UTC.":                               "Import e analisi di %s in corso, iniziati alle %s UTC.",
+	"UTC, or the zone of the collection":                                        "UTC, o il fuso della raccolta",
 	"Times without an offset were read in %s, the time zone of the collection.": "Gli orari senza fuso sono stati letti in %s, il fuso della raccolta.",
 	"Import of %s failed: %s":                                                   "Import di %s non riuscito: %s", "Last import: %d files, %d events, %d findings.": "Ultimo import: %d file, %d eventi, %d finding.",
 	"Severity": "Gravità", "all": "tutte", "low or higher": "bassa o superiore", "medium or higher": "media o superiore", "high or higher": "alta o superiore",

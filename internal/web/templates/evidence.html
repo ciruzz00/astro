@@ -18,7 +18,7 @@
     <label class="field field-wide"><span>{{t "Or a path on the computer where astro runs"}}</span>
       <input name="path" maxlength="4096" placeholder="/evidence/triage" value="{{.Form.Path}}" autocomplete="off" spellcheck="false"></label>
     <label class="field"><span>{{t "Time zone of the logs"}}</span>
-      <input name="tz" value="{{.Form.TZ}}" list="zones" autocomplete="off" spellcheck="false"></label>
+      <input name="tz" value="{{.Form.TZ}}" placeholder="{{t "UTC, or the zone of the collection"}}" list="zones" autocomplete="off" spellcheck="false"></label>
     <datalist id="zones"><option value="UTC"><option value="Europe/Rome"><option value="Europe/London"><option value="Europe/Berlin"><option value="America/New_York"><option value="America/Los_Angeles"><option value="Asia/Tokyo"></datalist>
     <label class="field"><span>{{t "Year of syslog lines"}}</span>
       <input name="year" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="{{t "from the file date"}}" value="{{.Form.Year}}"></label>
