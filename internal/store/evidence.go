@@ -317,7 +317,12 @@ func (s *Store) Events(ctx context.Context, caseName string, f EventFilter) ([]l
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM events ev WHERE `+cond, args...).Scan(&total); err != nil { // #nosec G202 -- cond only joins constant clauses; values are parameters
 		return nil, 0, err
 	}
-	limit := f.Limit
+	out, _, err := s.events(ctx, cond, args, f.Limit, f.Offset)
+	return out, total, err
+}
+
+// events runs a timeline query; cond joins constant clauses only.
+func (s *Store) events(ctx context.Context, cond string, args []any, limit, offset int) ([]logs.Event, int, error) {
 	if limit <= 0 || limit > MaxEventPage {
 		limit = MaxEventPage
 	}
@@ -326,8 +331,8 @@ func (s *Store) Events(ctx context.Context, caseName string, f EventFilter) ([]l
 		ev.parent, ev.command_line, ev.message, ev.fields, ev.raw, ev.severity, ev.record,
 		ev.evidence_id, e.path, e.sha256
 		FROM events ev JOIN evidence e ON e.id = ev.evidence_id
-		WHERE `+cond+` ORDER BY ev.time_ns, ev.evidence_id, ev.seq, ev.id LIMIT ? OFFSET ?`, // #nosec G202 -- see above
-		append(args, limit, max(f.Offset, 0))...)
+		WHERE `+cond+` ORDER BY ev.time_ns, ev.evidence_id, ev.seq, ev.id LIMIT ? OFFSET ?`, // #nosec G202 -- cond only joins constant clauses; values are parameters
+		append(args, limit, max(offset, 0))...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -352,5 +357,5 @@ func (s *Store) Events(ctx context.Context, caseName string, f EventFilter) ([]l
 		}
 		out = append(out, e)
 	}
-	return out, total, rows.Err()
+	return out, len(out), rows.Err()
 }
