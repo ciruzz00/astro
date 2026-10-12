@@ -182,7 +182,7 @@ func events(e Entry, n int, opts logs.Options, floor int64) []*logs.Event {
 			Time: time.Unix(t, 0).UTC(), Host: opts.Host, Source: opts.Source, Kind: kind,
 			Message: fmt.Sprintf("%s %s (%s, %d bytes, uid %s)", macb, e.Name, e.perms(), e.Size, e.UID),
 			Fields: map[string]string{"path": e.Name, "macb": macb, "mode": e.perms(), "uid": e.UID, "gid": e.GID,
-				"size": strconv.FormatInt(e.Size, 10), "inode": e.Inode, "mtime": strconv.FormatInt(e.Mtime, 10)},
+				"size": strconv.FormatInt(e.Size, 10), "inode": e.Inode, "mtime": time.Unix(e.Mtime, 0).UTC().Format(time.RFC3339)},
 			Raw: logs.Truncate(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%d|%d", e.MD5, e.Name, e.Inode, e.Mode, e.UID, e.GID,
 				e.Size, e.Atime, e.Mtime, e.Ctime, e.Crtime), 4096),
 			Ref: logs.EvidenceRef{Record: "line " + strconv.Itoa(n)},

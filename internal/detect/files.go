@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -157,8 +156,8 @@ func (r *fileRules) packaged(e *logs.Event) bool {
 	if strings.HasPrefix(path.Base(e.Fields["path"]), "snap.") && strings.Contains(e.Fields["path"], "/systemd/") {
 		return true
 	}
-	m, err := strconv.ParseInt(e.Fields["mtime"], 10, 64)
-	return err == nil && m > 0 && time.Unix(m, 0).Before(r.installed)
+	m, err := time.Parse(time.RFC3339, e.Fields["mtime"])
+	return err == nil && m.Unix() > 0 && m.Before(r.installed)
 }
 
 // tools links the use of an archive tool to a transfer tool soon after.

@@ -96,7 +96,7 @@ func TestPackageDatesBeforeInstallAreSkipped(t *testing.T) {
 			t.Errorf("package date kept: %+v", e)
 		}
 	}
-	if len(evs) != 3 || evs[1].Fields["mtime"] != "1620000000" {
+	if len(evs) != 3 || evs[1].Fields["mtime"] != "2021-05-03T00:00:00Z" {
 		t.Errorf("events = %d, second %+v", len(evs), evs[1])
 	}
 }
