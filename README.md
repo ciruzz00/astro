@@ -325,7 +325,8 @@ tested, while the commands and views that use them are still to come.
 | ✅ ready | **Windows event logs (EVTX)**, read by a parser written from scratch with the Go standard library only: Security, System, Sysmon, PowerShell, Defender, RDP and any other channel, including "dirty" files copied from a live system, damaged chunks and partly written records. Users, source addresses, processes and command lines are extracted from the common events. |
 | ✅ ready | **Detection rules** mapped to MITRE ATT&CK, for Linux, Windows and web logs alike: brute force and password spraying followed by a successful login, new accounts and administrators, persistence (services, scheduled tasks, cron, systemd, SSH keys, Run keys), dangerous commands (reverse shells, download and execute, encoded PowerShell, LOLBins, credential dumping, shadow copy deletion), cleared or truncated logs, DCSync, Kerberoasting and AS-REP roasting, LSASS access, web scanners and exploitation attempts. Each finding cites the events that prove it, and those events take its severity in the timeline. |
 | ✅ ready | **Command line**: `astro logs import`, `timeline`, `findings`, `evidence` and `analyze`, with filters (severity, host, user, address, source, event ID, text, time range), severity colors, CSV and JSON export, and the chain of custody of every file. |
-| 🔜 planned | **Timeline and findings** in the terminal interface, the web interface and the REST API. |
+| ✅ ready | **Web interface**: every case gets Evidence, Timeline and Findings tabs. Logs are imported from a local path in the background; the timeline has filters, pages, rows colored by severity that open on the event details and the raw record, and CSV export; findings link to MITRE ATT&CK and list the events that prove them. In English and Italian. |
+| 🔜 planned | **Timeline and findings** in the terminal interface and the REST API. |
 | 🔜 planned | **Reports**: timeline, findings, evidence inventory and chain of custody in the PDF, Markdown, JSON and STIX exports, plus a CSV timeline. |
 
 ```sh
@@ -405,9 +406,10 @@ legge anche file "sporchi" o danneggiati. Sono pronte anche le regole di
 rilevamento mappate su MITRE ATT&CK (brute force seguito da login, nuovi
 amministratori, persistenza, comandi pericolosi, log cancellati, DCSync,
 Kerberoasting, attacchi web e altro): ogni finding cita gli eventi che lo
-provano. Da riga di comando è già tutto utilizzabile (`astro logs import`,
-`timeline`, `findings`, `evidence`); arriveranno la timeline e i finding
-nell'interfaccia web, nella TUI, nella REST API e nei report.
+provano. Si usa già da riga di comando (`astro logs import`, `timeline`, `findings`,
+`evidence`) e dall'interfaccia web, con le schede Prove, Timeline e Finding in
+ogni caso; arriveranno la timeline e i finding nella TUI, nella REST API e nei
+report.
 
 ## License
 

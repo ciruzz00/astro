@@ -16,6 +16,7 @@
     <li><a href="#verdicts">Verdetti</a></li>
     <li><a href="#extract">Estrazione</a></li>
     <li><a href="#cases">Casi</a></li>
+    <li><a href="#logs">Analisi dei log</a></li>
     <li><a href="#tlp">TLP</a></li>
     <li><a href="#export">Export</a></li>
     <li><a href="#sources">Fonti e dataset</a></li>
@@ -60,6 +61,16 @@
   <li><strong>Cerca nuovi</strong> interroga solo gli indicatori mai cercati; <strong>Cerca di nuovo tutti</strong> aggiorna ogni risultato.</li>
   <li><strong>Note</strong>: timeline e conclusioni in Markdown, riportate negli export.</li>
   <li><strong>Chiudi</strong> un caso concluso (resta consultabile in "Includi chiusi"); <strong>Elimina</strong> lo cancella definitivamente, dopo aver scritto il suo nome.</li>
+</ul>
+
+<h2 id="logs">Analisi dei log</h2>
+<p>Ogni caso ha le schede <strong>Prove</strong>, <strong>Timeline</strong> e <strong>Finding</strong>. In <strong>Prove</strong> indichi il percorso di un file o di una cartella <em>sul computer dove gira astro</em> (se astro gira in Docker, il percorso dentro il container): astro riconosce da solo i log di Windows (.evtx), auth.log/secure/syslog, wtmp/btmp/utmp, la history di bash e zsh, gli access log web e i log dei container Docker, anche compressi (.gz). L'import avviene in background e la pagina si aggiorna da sola quando ha finito.</p>
+<ul>
+  <li>I file vengono letti dove sono e <strong>mai modificati</strong>: astro ne calcola SHA-256, SHA-1 e MD5 e tiene una <strong>catena di custodia</strong> a sola aggiunta, con gli hash concatenati, verificata a ogni apertura della pagina.</li>
+  <li>Le righe syslog non hanno anno né fuso: l'anno si deduce dalla data del file (o lo indichi tu) e il fuso è quello che scegli. Tutti gli orari sono mostrati in <strong>UTC</strong>; <code>~</code> segna un anno dedotto, <code>?</code> un comando senza orario.</li>
+  <li>Dopo l'import partono le <strong>regole di rilevamento</strong>, mappate su MITRE ATT&amp;CK: brute force seguito da login, nuovi amministratori, persistenza, comandi pericolosi, log cancellati o troncati, DCSync, Kerberoasting, attacchi web e altro. Ogni finding cita gli eventi che lo provano, con file e riga.</li>
+  <li>Nella <strong>Timeline</strong> gli eventi critici sono in rosso, gli alti in arancione, i medi in giallo e i bassi in blu; i filtri si combinano e l'export CSV prende tutti gli eventi filtrati.</li>
+  <li><strong>Aggiungi gli indicatori al caso</strong> copia IP, URL e hash dei finding tra gli indicatori senza cercarli: le fonti online vengono interrogate solo quando li cerchi, e gli indirizzi interni mai.</li>
 </ul>
 
 <h2 id="tlp">TLP (Traffic Light Protocol 2.0)</h2>
@@ -111,6 +122,7 @@
 <tr><td>Fonti e dataset</td><td><code>astro providers</code>, <code>astro sync</code></td></tr>
 <tr><td>Chiavi API</td><td><code>astro keys list|set|unset|test</code></td></tr>
 <tr><td>Token di accesso</td><td><code>astro token create|list|revoke</code></td></tr>
+<tr><td>Analisi dei log</td><td><code>astro logs import|timeline|findings|evidence|analyze …</code></td></tr>
 <tr><td>Interfaccia nel terminale</td><td><code>astro tui</code> (ricerca, casi, export e fonti da tastiera)</td></tr>
 </tbody></table>
 </article>
@@ -125,6 +137,7 @@
     <li><a href="#verdicts">Verdicts</a></li>
     <li><a href="#extract">Extract</a></li>
     <li><a href="#cases">Cases</a></li>
+    <li><a href="#logs">Log analysis</a></li>
     <li><a href="#tlp">TLP</a></li>
     <li><a href="#export">Export</a></li>
     <li><a href="#sources">Sources and datasets</a></li>
@@ -169,6 +182,16 @@
   <li><strong>Search new</strong> queries only the indicators never searched; <strong>Search all again</strong> refreshes every result.</li>
   <li><strong>Notes</strong>: timeline and findings in Markdown, carried into the exports.</li>
   <li><strong>Close</strong> a finished case (it stays available under "Include closed"); <strong>Delete</strong> removes it permanently after you type its name.</li>
+</ul>
+
+<h2 id="logs">Log analysis</h2>
+<p>Every case has the <strong>Evidence</strong>, <strong>Timeline</strong> and <strong>Findings</strong> tabs. In <strong>Evidence</strong> you give the path of a file or folder <em>on the computer where astro runs</em> (when astro runs in Docker, the path inside the container): astro recognizes Windows event logs (.evtx), auth.log/secure/syslog, wtmp/btmp/utmp, bash and zsh history, web access logs and Docker container logs, also compressed (.gz). The import runs in the background and the page refreshes when it is done.</p>
+<ul>
+  <li>Files are read where they are and <strong>never modified</strong>: astro computes SHA-256, SHA-1 and MD5 and keeps an append-only, hash-chained <strong>chain of custody</strong>, verified every time the page opens.</li>
+  <li>Syslog lines have no year and no time zone: the year comes from the file date (or the one you give) and the zone is the one you choose. All times are shown in <strong>UTC</strong>; <code>~</code> marks a guessed year, <code>?</code> a command without a time.</li>
+  <li>After the import the <strong>detection rules</strong> run, mapped to MITRE ATT&amp;CK: brute force followed by a login, new administrators, persistence, dangerous commands, cleared or truncated logs, DCSync, Kerberoasting, web attacks and more. Each finding cites the events that prove it, with file and line.</li>
+  <li>In the <strong>Timeline</strong> critical events are red, high orange, medium yellow and low blue; filters combine and the CSV export takes every filtered event.</li>
+  <li><strong>Add indicators to the case</strong> copies the addresses, URLs and hashes of the findings into the case without searching them: online sources are queried only when you search them, and internal addresses never.</li>
 </ul>
 
 <h2 id="tlp">TLP (Traffic Light Protocol 2.0)</h2>
@@ -220,6 +243,7 @@
 <tr><td>Sources and datasets</td><td><code>astro providers</code>, <code>astro sync</code></td></tr>
 <tr><td>API keys</td><td><code>astro keys list|set|unset|test</code></td></tr>
 <tr><td>Access tokens</td><td><code>astro token create|list|revoke</code></td></tr>
+<tr><td>Log analysis</td><td><code>astro logs import|timeline|findings|evidence|analyze …</code></td></tr>
 <tr><td>Terminal interface</td><td><code>astro tui</code> (search, cases, exports and sources from the keyboard)</td></tr>
 </tbody></table>
 </article>
