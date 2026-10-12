@@ -65,7 +65,7 @@ func toEvent(root *node, recordID uint64, written time.Time, opts logs.Options) 
 	if ip, ok := address(pick(data, "DestAddress", "DestinationIp")); ok {
 		e.DstIP = ip
 	}
-	e.Process = pick(data, "NewProcessName", "Image", "ProcessName", "Application")
+	e.Process = pick(data, "NewProcessName", "Image", "SourceImage", "ProcessName", "Application")
 	e.Parent = pick(data, "ParentProcessName", "ParentImage")
 	e.CommandLine = pick(data, "CommandLine", "ScriptBlockText", "ImagePath", "ServiceFileName", "Payload")
 
@@ -290,6 +290,9 @@ func message(e *logs.Event, data map[string]string) string {
 	add("service", pick(data, "ServiceName"))
 	add("task", pick(data, "TaskName"))
 	add("process", e.Process)
+	add("target", pick(data, "TargetImage", "TargetFilename", "TargetObject"))
+	add("query", pick(data, "QueryName"))
+	add("port", pick(data, "DestinationPort"))
 	if e.CommandLine != "" {
 		add("command", logs.Truncate(e.CommandLine, 300))
 	}
