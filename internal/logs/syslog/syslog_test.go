@@ -154,8 +154,20 @@ func TestMoreAuthMessages(t *testing.T) {
 		"Oct 11 22:00:01 web01 pkexec[51]: mallory: Error executing command as another user: Not authorized [USER=root] [TTY=unknown] [CWD=/tmp] [COMMAND=/bin/sh]\n" +
 		"Oct 11 22:00:02 web01 passwd[52]: password for 'deploy' changed by 'root'\n" +
 		"Oct 11 22:00:03 web01 sshd[53]: Server listening on 0.0.0.0 port 2222.\n" +
-		"Oct 11 22:00:04 web01 systemd-logind[54]: Removed session 12.\n"
+		"Oct 11 22:00:04 web01 systemd-logind[54]: Removed session 12.\n" +
+		"Oct 11 22:00:05 web01 login[55]: ROOT LOGIN  on '/dev/pts/7' from '203.0.113.9'\n" +
+		"Oct 11 22:00:06 web01 login[56]: LOGIN ON tty2 BY alice\n" +
+		"Oct 11 22:00:07 web01 gdm-password]: gkr-pam: unlocked login keyring\n"
 	evs, _ := parse(t, in, logs.Options{Year: 2026})
+	if e := evs[5]; e.Kind != KindRootLogin || e.User != "root" || e.Fields["tty"] != "/dev/pts/7" || e.SrcIP != "203.0.113.9" {
+		t.Errorf("root login = %+v", e)
+	}
+	if e := evs[6]; e.Kind != KindTerminalLogin || e.User != "alice" || e.Fields["tty"] != "tty2" {
+		t.Errorf("terminal login = %+v", e)
+	}
+	if e := evs[7]; e.Process != "gdm-password" || e.Message != "gkr-pam: unlocked login keyring" {
+		t.Errorf("GDM tag = %q / %q", e.Process, e.Message)
+	}
 	if e := evs[0]; e.Kind != KindPkexec || e.User != "alice" || e.CommandLine != "/usr/bin/id -u" || e.Fields["target_user"] != "root" || e.Fields["cwd"] != "/home/alice" {
 		t.Errorf("pkexec = %+v", e)
 	}

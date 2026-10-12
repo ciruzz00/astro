@@ -35,6 +35,8 @@ const (
 	KindCron            = "cron-command"
 	KindLogindSession   = "logind-session"
 	KindServiceStarted  = "service-started"
+	KindRootLogin       = "root-login"     // login(1): ROOT LOGIN on a terminal
+	KindTerminalLogin   = "terminal-login" // login(1): LOGIN ON tty BY user
 )
 
 // baseline is the severity of a kind before the detection rules look at
@@ -68,6 +70,8 @@ var (
 	reLogindGone  = regexp.MustCompile(`^Removed session (\S+?)\.?$`)
 	reLogind      = regexp.MustCompile(`^New session (\S+) of user (\S+?)\.?$`)
 	reStarted     = regexp.MustCompile(`^Started (.+?)\.?$`)
+	reRootLogin   = regexp.MustCompile(`^ROOT LOGIN\s+(?:ON|on) '?([^'\s]+)'?(?:\s+(?:FROM|from) '?([^'\s]*)'?)?`)
+	reTermLogin   = regexp.MustCompile(`^LOGIN ON '?([^'\s]+)'? BY '?([^'\s]+)'?(?: FROM '?([^'\s]*)'?)?`)
 )
 
 // classify fills the kind, user, addresses and a readable message.
@@ -122,6 +126,24 @@ func classify(e *logs.Event, prog, msg string) {
 		if m := reCron.FindStringSubmatch(msg); m != nil {
 			e.Kind, e.User, e.CommandLine = KindCron, m[1], m[2]
 			e.Message = fmt.Sprintf("cron job of %s: %s", m[1], m[2])
+		}
+	case prog == "login":
+		if m := reRootLogin.FindStringSubmatch(msg); m != nil {
+			e.Kind, e.User = KindRootLogin, "root"
+			setField(e, "tty", m[1])
+			e.Message = "root login on " + m[1]
+			if m[2] != "" {
+				e.Message += " from " + m[2]
+				setIP(e, m[2])
+			}
+		} else if m := reTermLogin.FindStringSubmatch(msg); m != nil {
+			e.Kind, e.User = KindTerminalLogin, m[2]
+			setField(e, "tty", m[1])
+			e.Message = fmt.Sprintf("login of %s on %s", m[2], m[1])
+			if m[3] != "" {
+				e.Message += " from " + m[3]
+				setIP(e, m[3])
+			}
 		}
 	case prog == "systemd-logind":
 		if m := reLogind.FindStringSubmatch(msg); m != nil {

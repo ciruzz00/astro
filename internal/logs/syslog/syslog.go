@@ -33,7 +33,8 @@ var (
 	re3164 = regexp.MustCompile(`^([A-Z][a-z]{2}) +(\d{1,2}) (\d\d):(\d\d):(\d\d) (\S+) (.*)$`)
 	reISO  = regexp.MustCompile(`^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:?\d\d)) (\S+) (.*)$`)
 	re5424 = regexp.MustCompile(`^<(\d{1,3})>1 (\S+) (\S+) (\S+) (\S+) (\S+) (.*)$`)
-	reTag  = regexp.MustCompile(`^([^\s\[\]:]{1,64})(?:\[(\d{1,10})\])?: ?(.*)$`)
+	// The optional "]" after the name is a GDM quirk ("gdm-password]: ...").
+	reTag = regexp.MustCompile(`^([^\s\[\]:]{1,64})\]?(?:\[(\d{1,10})\])?: ?(.*)$`)
 
 	months = map[string]time.Month{"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
 		"Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}

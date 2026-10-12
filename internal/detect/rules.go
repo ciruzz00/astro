@@ -151,6 +151,19 @@ var eventRules = []eventRule{
 	{Rule: Rule{"linux-root-ssh", "Direct SSH login as root", logs.Medium, "T1078.003"},
 		match: func(e *logs.Event) bool { return e.Kind == syslog.KindSSHAccepted && e.User == "root" },
 		group: func(e *logs.Event) string { return e.Host + "|" + e.SrcIP }},
+	{Rule: Rule{"linux-telnet-login", "Login through telnet (cleartext remote shell)", logs.Medium, "T1021"},
+		match: func(e *logs.Event) bool {
+			return e.Kind == syslog.KindSessionOpened && strings.Contains(strings.ToLower(field(e, "by")), "telnet")
+		}},
+	{Rule: Rule{"linux-root-remote-terminal", "Root login on a remote terminal (telnet or rlogin)", logs.High, "T1078.003"},
+		match: func(e *logs.Event) bool {
+			return e.Kind == syslog.KindRootLogin && strings.Contains(field(e, "tty"), "pts")
+		}},
+	{Rule: Rule{"linux-telnet-server", "Telnet server running", logs.Low, ""},
+		match: func(e *logs.Event) bool {
+			return e.Kind == syslog.KindServiceStarted && strings.Contains(strings.ToLower(field(e, "unit")), "telnet")
+		},
+		group: func(e *logs.Event) string { return strings.ToLower(e.Host) }},
 	{Rule: Rule{"log-truncated", "Log truncated while being written or abrupt stop", logs.High, "T1070.002"},
 		match: func(e *logs.Event) bool { return e.Kind == logs.KindNULPadding },
 		group: func(e *logs.Event) string { return e.Host + "|" + e.Source + "|" + e.Ref.Record }},
